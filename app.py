@@ -12,7 +12,15 @@ from services.scheduler import run_automation
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-dev-key')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+
+# Configura o diretório persistente de dados, caso exista
+DATA_DIR = os.environ.get('DATA_DIR', os.getcwd())
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+# Define o caminho do banco de dados apontando para o Disco Persistente
+db_path = os.path.join(DATA_DIR, 'database.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
