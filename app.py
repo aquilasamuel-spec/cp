@@ -252,6 +252,40 @@ def save_treasury():
         
     return redirect(url_for('treasury'))
 
+@app.route('/tesouraria/editar/<int:id>', methods=['POST'])
+@login_required
+@roles_required(['master', 'tesoureiro'])
+def edit_treasury(id):
+    entry = TreasuryEntry.query.get_or_404(id)
+    try:
+        valor = request.form.get('valor').replace(',', '.')
+        entry.amount = float(valor)
+        entry.type = request.form.get('tipo')
+        entry.category = request.form.get('categoria')
+        entry.observation = request.form.get('observacao')
+        if request.form.get('data'):
+            entry.date = datetime.strptime(request.form.get('data'), '%Y-%m-%d')
+        db.session.commit()
+        flash('Lançamento atualizado com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao atualizar: {e}', 'danger')
+        
+    return redirect(url_for('treasury'))
+
+@app.route('/tesouraria/excluir/<int:id>', methods=['POST'])
+@login_required
+@roles_required(['master', 'tesoureiro'])
+def delete_treasury(id):
+    entry = TreasuryEntry.query.get_or_404(id)
+    try:
+        db.session.delete(entry)
+        db.session.commit()
+        flash('Lançamento excluído com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao excluir: {e}', 'danger')
+        
+    return redirect(url_for('treasury'))
+
 @app.route('/admin/acessos')
 @login_required
 @roles_required(['master'])
