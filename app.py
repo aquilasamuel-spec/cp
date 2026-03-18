@@ -362,13 +362,14 @@ def notify_leaders_today():
 def forbidden(e):
     return render_template('errors/403.html'), 403
 
+with app.app_context():
+    db.create_all()
+    # Verifica inicialmente se o admin existe
+    if not User.query.filter_by(username='admin').first():
+        user = User(username='admin', role='master')
+        user.set_password('admin123')
+        db.session.add(user)
+        db.session.commit()
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        if not User.query.filter_by(username='admin').first():
-            user = User(username='admin', role='master')
-            user.set_password('admin123')
-            db.session.add(user)
-            db.session.commit()
-    
     app.run(debug=True)
