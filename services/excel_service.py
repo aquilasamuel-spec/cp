@@ -1,10 +1,24 @@
 import pandas as pd
 import os
+import shutil
 from datetime import datetime
 
-# Fontes de dados
-PRIMARY_FILE = 'CADASTRAMENTO_CP.xlsx'
-ACTIVE_FILE = 'MEMBROS_ATIVOS.xlsx'
+DATA_DIR = os.environ.get('DATA_DIR', os.getcwd())
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+for f in ['CADASTRAMENTO_CP.xlsx', 'MEMBROS_ATIVOS.xlsx']:
+    src = os.path.join(os.getcwd(), f)
+    dst = os.path.join(DATA_DIR, f)
+    if not os.path.exists(dst) and os.path.exists(src) and src != dst:
+        try:
+            shutil.copy2(src, dst)
+        except Exception as e:
+            print(f"Erro ao copiar {f}: {e}")
+
+# Fontes de dados persistentes
+PRIMARY_FILE = os.path.join(DATA_DIR, 'CADASTRAMENTO_CP.xlsx')
+ACTIVE_FILE = os.path.join(DATA_DIR, 'MEMBROS_ATIVOS.xlsx')
 
 def get_best_col(df, standard_name):
     """Encontra o melhor nome de coluna no DataFrame para um nome padrão."""
@@ -26,9 +40,8 @@ def clean_phone(val):
 
 def get_members_data():
     """Lê os dados dos membros, priorizando o arquivo de dados ativos e complementando com o primário."""
-    base_path = os.getcwd()
-    primary_path = os.path.join(base_path, PRIMARY_FILE)
-    active_path = os.path.join(base_path, ACTIVE_FILE)
+    primary_path = PRIMARY_FILE
+    active_path = ACTIVE_FILE
     
     df_active = None
     if os.path.exists(active_path):
