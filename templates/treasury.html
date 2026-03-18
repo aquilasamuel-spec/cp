@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold">Tesouraria</h2>
+    <p class="text-secondary">Gestão financeira e lançamentos do CP</p>
+</div>
+
+<div class="row g-4 mb-5">
+    <!-- Cards de Saldo -->
+    <div class="col-md-4">
+        <div class="card p-4 border-start border-success border-4">
+            <h6 class="text-secondary text-uppercase fw-bold small">Total Entradas</h6>
+            <h3 class="fw-bold text-success mb-0">R$ {{ "%.2f"|format(total_entrada) }}</h3>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-4 border-start border-danger border-4">
+            <h6 class="text-secondary text-uppercase fw-bold small">Total Saídas</h6>
+            <h3 class="fw-bold text-danger mb-0">R$ {{ "%.2f"|format(total_saida) }}</h3>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-4 border-start border-primary border-4 bg-primary bg-opacity-10">
+            <h6 class="text-primary text-uppercase fw-bold small">Saldo Atual</h6>
+            <h3 class="fw-bold text-primary mb-0">R$ {{ "%.2f"|format(saldo) }}</h3>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Formulário de Lançamento -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="fw-bold mb-0">Novo Lançamento</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('save_treasury') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Tipo</label>
+                        <select name="tipo" class="form-select" required>
+                            <option value="Entrada">Entrada</option>
+                            <option value="Saída">Saída</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Valor (R$)</label>
+                        <input type="text" name="valor" class="form-control" placeholder="0,00" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Categoria</label>
+                        <input type="text" name="categoria" class="form-control" placeholder="Ex: Mensalidade, Fardamento" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Data</label>
+                        <input type="date" name="data" class="form-control" value="{{ today }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observação</label>
+                        <textarea name="observacao" class="form-control" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Registrar Lançamento</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Lançamentos Recentes -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="fw-bold mb-0">Histórico de Transações</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr class="table-light">
+                                <th class="ps-4">Data</th>
+                                <th>Tipo</th>
+                                <th>Categoria</th>
+                                <th>Valor</th>
+                                <th class="pe-4">Obs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in entries %}
+                            <tr>
+                                <td class="ps-4">{{ entry.date.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if entry.type == 'Entrada' %}
+                                    <span class="badge bg-success-subtle text-success">Entrada</span>
+                                    {% else %}
+                                    <span class="badge bg-danger-subtle text-danger">Saída</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-medium">{{ entry.category }}</td>
+                                <td class="fw-bold {% if entry.type == 'Entrada' %}text-success{% else %}text-danger{% endif %}">
+                                    R$ {{ "%.2f"|format(entry.amount) }}
+                                </td>
+                                <td class="pe-4 small text-secondary">{{ entry.observation or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% if not entries %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-secondary">Nenhuma transação registrada.</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

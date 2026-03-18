@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="text-center py-5">
+    <div class="mb-4">
+        <i class="fas fa-lock text-danger fa-5x opacity-25"></i>
+    </div>
+    <h1 class="fw-bold text-dark">403 - Acesso Negado</h1>
+    <p class="text-secondary lead">Você não tem permissão para acessar esta área.</p>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-primary mt-3">
+        <i class="fas fa-arrow-left me-2"></i> Voltar ao Dashboard
+    </a>
+</div>
+{% endblock %}

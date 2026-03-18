@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold">Gestão de Acessos</h2>
+        <p class="text-secondary">Controle quem pode acessar o sistema e quais permissões eles possuem</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newUserModal">
+        <i class="fas fa-user-plus me-2"></i> Novo Acesso
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Usuário</th>
+                        <th>Função</th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3 text-primary">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <span class="fw-medium">{{ user.username }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-primary border border-primary border-opacity-10">
+                                {{ user.role|upper }}
+                            </span>
+                        </td>
+                        <td class="text-end pe-4">
+                            <button class="btn btn-sm btn-outline-primary me-2" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#editUserModal{{ user.id }}">
+                                <i class="fas fa-key"></i> Alterar
+                            </button>
+                            {% if user.username != 'admin' and user.id != current_user.id %}
+                            <a href="{{ url_for('delete_access', id=user.id) }}" 
+                               class="btn btn-sm btn-outline-danger"
+                               onclick="return confirm('Tem certeza que deseja excluir este acesso?')">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Novo Usuário -->
+<div class="modal fade" id="newUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+            <div class="modal-header bg-success text-white border-0 py-4">
+                <h5 class="modal-title fw-bold ms-2">Criar Novo Acesso</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('save_access') }}" method="POST">
+                <div class="modal-body p-4">
+                    <div class="mb-4">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Nome de Usuário</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0"><i class="fas fa-user text-muted"></i></span>
+                            <input type="text" name="username" class="form-control bg-light border-0" required placeholder="Ex: joao.silva">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Senha Inicial</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0"><i class="fas fa-lock text-muted"></i></span>
+                            <input type="password" name="password" class="form-control bg-light border-0" required placeholder="Digite uma senha forte">
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Função</label>
+                        <select name="role" class="form-select bg-light border-0" required>
+                            <option value="coordenador">Coordenador</option>
+                            <option value="secretario" selected>Secretário</option>
+                            <option value="tesoureiro">Tesoureiro</option>
+                            <option value="lider_jovens">Líder de Jovens</option>
+                            <option value="master">Master (Acesso Total)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success text-white px-4">Criar Acesso</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modais de Edição de Usuário (Fora do Card/Tabela) -->
+{% for user in users %}
+<div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+            <div class="modal-header bg-primary text-white border-0 py-4">
+                <h5 class="modal-title fw-bold ms-2">Alterar Acesso: {{ user.username }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('save_access') }}" method="POST">
+                <input type="hidden" name="user_id" value="{{ user.id }}">
+                <input type="hidden" name="username" value="{{ user.username }}">
+                <div class="modal-body p-4">
+                    <div class="mb-4">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Função</label>
+                        <select name="role" class="form-select bg-light border-0" required>
+                            <option value="master" {% if user.role == 'master' %}selected{% endif %}>Master (Acesso Total)</option>
+                            <option value="coordenador" {% if user.role == 'coordenador' %}selected{% endif %}>Coordenador</option>
+                            <option value="secretario" {% if user.role == 'secretario' %}selected{% endif %}>Secretário</option>
+                            <option value="tesoureiro" {% if user.role == 'tesoureiro' %}selected{% endif %}>Tesoureiro</option>
+                            <option value="lider_jovens" {% if user.role == 'lider_jovens' %}selected{% endif %}>Líder de Jovens</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Nova Senha (opcional)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0"><i class="fas fa-key text-muted"></i></span>
+                            <input type="password" name="password" class="form-control bg-light border-0" placeholder="Deixe em branco para manter">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary px-4">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}

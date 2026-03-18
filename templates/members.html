@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row g-3 mb-4 align-items-center">
+    <div class="col-md-4">
+        <h2 class="fw-bold mb-0">Gestão de Membros</h2>
+        <p class="text-secondary small mb-0">Visualize e edite as informações dos componentes do CP</p>
+    </div>
+    <div class="col-md-5">
+        <div class="input-group">
+            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-secondary"></i></span>
+            <input type="text" id="memberSearch" class="form-control border-start-0 ps-0" placeholder="Pesquisar membro por nome..." onkeyup="filterMembers()">
+        </div>
+    </div>
+    <div class="col-md-3 text-end">
+        <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#newMemberModal">
+            <i class="fas fa-plus me-2"></i> Novo Membro
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4" style="cursor: pointer;" onclick="sortTable(0)">Nome <i class="fas fa-sort text-muted ms-1"></i></th>
+                        <th style="cursor: pointer;" onclick="sortTable(1)">Nascimento <i class="fas fa-sort text-muted ms-1"></i></th>
+                        <th style="cursor: pointer;" onclick="sortTable(2)">Congregação <i class="fas fa-sort text-muted ms-1"></i></th>
+                        <th style="cursor: pointer;" onclick="sortTable(3)">Telefone <i class="fas fa-sort text-muted ms-1"></i></th>
+                        <th style="cursor: pointer;" onclick="sortTable(4)">Função <i class="fas fa-sort text-muted ms-1"></i></th>
+                        <th class="text-end pe-4">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="memberTableBody">
+                    {% for member in members %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3 text-primary">
+                                    {{ member.Nome[0]|upper if member.Nome else '?' }}
+                                </div>
+                                <span class="fw-medium">{{ member.Nome }}</span>
+                            </div>
+                        </td>
+                        <td>{{ member.Data_Nascimento }}</td>
+                        <td>{{ member.Congregação }}</td>
+                        <td>{{ member.Telefone or '-' }}</td>
+                        <td><span class="badge bg-light text-primary border border-primary border-opacity-10">{{ member.Cargo }}</span></td>
+                        <td class="text-end pe-4">
+                            <button type="button" class="btn btn-sm btn-outline-primary me-2" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#editModal{{ loop.index }}" title="Editar Membro">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#deleteModal{{ loop.index }}" title="Excluir Membro">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Novo Membro -->
+<div class="modal fade" id="newMemberModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold">Cadastrar Novo Membro</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('new_member') }}" method="POST">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nome Completo</label>
+                        <input type="text" name="nome" class="form-control" required placeholder="Ex: João Silva">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Data de Nascimento</label>
+                            <input type="text" name="nascimento" class="form-control" placeholder="DD/MM/AAAA">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Telefone</label>
+                            <input type="text" name="telefone" class="form-control" placeholder="(00) 00000-0000">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Cidade/Congregação</label>
+                        <input type="text" name="congregacao" class="form-control" placeholder="Ex: Campina Grande">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Função</label>
+                            <select name="cargo" class="form-select">
+                                <option value="COMPONENTE" selected>COMPONENTE</option>
+                                <option value="LIDER">LIDER</option>
+                                <option value="REGENTE">REGENTE</option>
+                                <option value="SECRETARIO">SECRETARIO</option>
+                                <option value="TESOUREIRO">TESOUREIRO</option>
+                                <option value="MIDIA">MIDIA</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Sexo</label>
+                            <select name="sexo" class="form-select">
+                                <option value="Masculino" selected>Masculino</option>
+                                <option value="Feminino">Feminino</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success text-white">Cadastrar Membro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modais de Edição (Fora do Card/Tabela para evitar conflitos de transform) -->
+{% for member in members %}
+<div class="modal fade" id="editModal{{ loop.index }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">Editar Membro</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('edit_member') }}" method="POST">
+                <div class="modal-body p-4">
+                    <input type="hidden" name="original_name" value="{{ member.Nome }}">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nome Completo</label>
+                        <input type="text" name="nome" class="form-control" value="{{ member.Nome }}" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Data de Nascimento</label>
+                            <input type="text" name="nascimento" class="form-control" value="{{ member.Data_Nascimento }}" placeholder="DD/MM/AAAA">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Telefone</label>
+                            <input type="text" name="telefone" class="form-control" value="{{ member.Telefone }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Cidade/Congregação</label>
+                        <input type="text" name="congregacao" class="form-control" value="{{ member.Congregação }}">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Função</label>
+                            <select name="cargo" class="form-select">
+                                <option value="LIDER" {% if member.Cargo == 'LIDER' %}selected{% endif %}>LIDER</option>
+                                <option value="REGENTE" {% if member.Cargo == 'REGENTE' %}selected{% endif %}>REGENTE</option>
+                                <option value="SECRETARIO" {% if member.Cargo == 'SECRETARIO' %}selected{% endif %}>SECRETARIO</option>
+                                <option value="TESOUREIRO" {% if member.Cargo == 'TESOUREIRO' %}selected{% endif %}>TESOUREIRO</option>
+                                <option value="MIDIA" {% if member.Cargo == 'MIDIA' %}selected{% endif %}>MIDIA</option>
+                                <option value="COMPONENTE" {% if member.Cargo == 'COMPONENTE' %}selected{% endif %}>COMPONENTE</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Sexo</label>
+                            <select name="sexo" class="form-select">
+                                <option value="Masculino" {% if member.Gênero == 'Masculino' %}selected{% endif %}>Masculino</option>
+                                <option value="Feminino" {% if member.Gênero == 'Feminino' %}selected{% endif %}>Feminino</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Exclusão -->
+<div class="modal fade" id="deleteModal{{ loop.index }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <i class="fas fa-exclamation-triangle text-danger fa-3x mb-3"></i>
+                <h5 class="fw-bold">Tem certeza?</h5>
+                <p>Você está prestes a excluir permanentemente o membro <strong class="text-danger">{{ member.Nome }}</strong>. Esta ação não poderá ser desfeita.</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center pb-4">
+                <form action="{{ url_for('remove_member', nome=member.Nome) }}" method="POST" class="w-100 d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger px-4">Sim, Excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+    function filterMembers() {
+        const input = document.getElementById('memberSearch');
+        const filter = input.value.toUpperCase();
+        const tbody = document.getElementById('memberTableBody');
+        const tr = tbody.getElementsByTagName('tr');
+
+        for (let i = 0; i < tr.length; i++) {
+            // O nome está na primeira coluna (índice 0), dentro de um span.fw-medium
+            const nameSpan = tr[i].getElementsByClassName('fw-medium')[0];
+            if (nameSpan) {
+                const txtValue = nameSpan.textContent || nameSpan.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+    }
+
+    let sortDirections = [false, false, false, false, false];
+
+    function sortTable(columnIndex) {
+        const tbody = document.getElementById('memberTableBody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const headers = document.querySelectorAll('thead th');
+        
+        // Toggle direction
+        sortDirections[columnIndex] = !sortDirections[columnIndex];
+        const isAscending = sortDirections[columnIndex];
+
+        rows.sort((rowA, rowB) => {
+            let cellA = rowA.querySelectorAll('td')[columnIndex].innerText.trim();
+            let cellB = rowB.querySelectorAll('td')[columnIndex].innerText.trim();
+
+            // Tratamento especial para Dadas (DD/MM/AAAA)
+            if (columnIndex === 1) {
+                const partsA = cellA.split('/');
+                const partsB = cellB.split('/');
+                if (partsA.length === 3 && partsB.length === 3) {
+                    cellA = `${partsA[2]}${partsA[1]}${partsA[0]}`; // YYYYMMDD
+                    cellB = `${partsB[2]}${partsB[1]}${partsB[0]}`;
+                }
+            }
+
+            if (cellA < cellB) return isAscending ? -1 : 1;
+            if (cellA > cellB) return isAscending ? 1 : -1;
+            return 0;
+        });
+
+        // Re-append sorted rows
+        rows.forEach(row => tbody.appendChild(row));
+
+        // Reseta todos os ícones e aplica o correto na coluna clicada
+        headers.forEach((th, idx) => {
+            const icon = th.querySelector('i');
+            if (icon) {
+                if (idx === columnIndex) {
+                    icon.className = isAscending ? 'fas fa-sort-up ms-1 text-primary' : 'fas fa-sort-down ms-1 text-primary';
+                } else {
+                    icon.className = 'fas fa-sort text-muted ms-1 opacity-50';
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}
