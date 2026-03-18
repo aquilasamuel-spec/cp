@@ -81,7 +81,8 @@
                                 <th>Tipo</th>
                                 <th>Categoria</th>
                                 <th>Valor</th>
-                                <th class="pe-4">Obs</th>
+                                <th>Obs</th>
+                                <th class="text-end pe-4">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -99,12 +100,20 @@
                                 <td class="fw-bold {% if entry.type == 'Entrada' %}text-success{% else %}text-danger{% endif %}">
                                     R$ {{ "%.2f"|format(entry.amount) }}
                                 </td>
-                                <td class="pe-4 small text-secondary">{{ entry.observation or '-' }}</td>
+                                <td class="small text-secondary">{{ entry.observation or '-' }}</td>
+                                <td class="text-end pe-4">
+                                    <button type="button" class="btn btn-sm btn-outline-primary mb-1" data-bs-toggle="modal" data-bs-target="#editModal{{ entry.id }}" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger mb-1" data-bs-toggle="modal" data-bs-target="#deleteModal{{ entry.id }}" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
                             </tr>
                             {% endfor %}
                             {% if not entries %}
                             <tr>
-                                <td colspan="5" class="text-center py-5 text-secondary">Nenhuma transação registrada.</td>
+                                <td colspan="6" class="text-center py-5 text-secondary">Nenhuma transação registrada.</td>
                             </tr>
                             {% endif %}
                         </tbody>
@@ -114,4 +123,71 @@
         </div>
     </div>
 </div>
+{% for entry in entries %}
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal{{ entry.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">Editar Lançamento</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('edit_treasury', id=entry.id) }}" method="POST">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label">Tipo</label>
+                        <select name="tipo" class="form-select" required>
+                            <option value="Entrada" {% if entry.type == 'Entrada' %}selected{% endif %}>Entrada</option>
+                            <option value="Saída" {% if entry.type == 'Saída' %}selected{% endif %}>Saída</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Valor (R$)</label>
+                        <input type="text" name="valor" class="form-control" value="{{ "%.2f"|format(entry.amount) }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Categoria</label>
+                        <input type="text" name="categoria" class="form-control" value="{{ entry.category }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Data</label>
+                        <input type="date" name="data" class="form-control" value="{{ entry.date.strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observação</label>
+                        <textarea name="observacao" class="form-control" rows="3">{{ entry.observation or '' }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal{{ entry.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <i class="fas fa-exclamation-triangle text-danger fa-3x mb-3"></i>
+                <h5 class="fw-bold">Tem certeza?</h5>
+                <p>Você está prestes a excluir este lançamento de <strong class="text-danger">R$ {{ "%.2f"|format(entry.amount) }}</strong>. Esta ação não poderá ser desfeita.</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center pb-4">
+                <form action="{{ url_for('delete_treasury', id=entry.id) }}" method="POST" class="w-100 d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger px-4">Sim, Excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 {% endblock %}

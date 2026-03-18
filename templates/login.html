@@ -6,22 +6,24 @@
         <div class="text-center mb-4">
             <img src="{{ url_for('static', filename='logo_cp.png') }}" alt="Logo" style="height: 60px;">
             <h4 class="fw-bold mt-3 text-primary">Acesso Restrito</h4>
-            <p class="text-secondary small">Gestão Cantico Pentecostal</p>
+            <p class="text-secondary small">Gestão Cântico Pentecostal</p>
         </div>
-        
+
         <form action="{{ url_for('login') }}" method="POST">
             <div class="mb-3">
                 <label class="form-label fw-600">Usuário</label>
                 <div class="input-group">
                     <span class="input-group-text bg-light border-0"><i class="fas fa-user text-secondary"></i></span>
-                    <input type="text" name="username" class="form-control bg-light border-0" required placeholder="Digite seu usuário">
+                    <input type="text" name="username" class="form-control bg-light border-0" required
+                        placeholder="Digite seu usuário">
                 </div>
             </div>
             <div class="mb-4">
                 <label class="form-label fw-600">Senha</label>
                 <div class="input-group">
                     <span class="input-group-text bg-light border-0"><i class="fas fa-lock text-secondary"></i></span>
-                    <input type="password" name="password" class="form-control bg-light border-0" required placeholder="Digite sua senha">
+                    <input type="password" name="password" class="form-control bg-light border-0" required
+                        placeholder="Digite sua senha">
                 </div>
             </div>
             <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">Entrar</button>
