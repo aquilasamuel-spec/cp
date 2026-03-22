@@ -30,3 +30,15 @@ class TreasuryEntry(db.Model):
     category = db.Column(db.String(50), nullable=False)
     observation = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+class Rehearsal(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+class RehearsalAttendance(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    rehearsal_id = db.Column(db.Integer, db.ForeignKey('rehearsal.id', ondelete='CASCADE'), nullable=False)
+    member_name = db.Column(db.String(100), nullable=False)
+    is_present = db.Column(db.Boolean, default=False)
