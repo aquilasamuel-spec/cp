@@ -1,9 +1,40 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="mb-4">
-    <h2 class="fw-bold">Tesouraria</h2>
-    <p class="text-secondary">Gestão financeira e lançamentos do CP</p>
+<div class="mb-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+    <div>
+        <h2 class="fw-bold m-0"><i class="fas fa-wallet text-success me-2"></i>Tesouraria</h2>
+        <p class="text-secondary m-0">Gestão financeira e lançamentos do CP</p>
+    </div>
+    <div class="d-flex flex-column flex-md-row align-items-md-center mt-3 mt-md-0">
+        <a href="{{ url_for('relatorio_geral_tesouraria', month=selected_month, year=selected_year) }}" class="btn btn-danger shadow-sm me-0 me-md-3 mb-2 mb-md-0">
+            <i class="fas fa-file-pdf fa-sm me-1"></i> Baixar Relatório (PDF)
+        </a>
+        <form method="GET" action="{{ url_for('treasury') }}" class="d-flex align-items-center bg-white p-2 border rounded shadow-sm">
+        <select name="month" class="form-select form-select-sm me-2" style="width: 140px;">
+            <option value="">Todos os Meses</option>
+            <option value="1" {% if selected_month == 1 %}selected{% endif %}>Janeiro</option>
+            <option value="2" {% if selected_month == 2 %}selected{% endif %}>Fevereiro</option>
+            <option value="3" {% if selected_month == 3 %}selected{% endif %}>Março</option>
+            <option value="4" {% if selected_month == 4 %}selected{% endif %}>Abril</option>
+            <option value="5" {% if selected_month == 5 %}selected{% endif %}>Maio</option>
+            <option value="6" {% if selected_month == 6 %}selected{% endif %}>Junho</option>
+            <option value="7" {% if selected_month == 7 %}selected{% endif %}>Julho</option>
+            <option value="8" {% if selected_month == 8 %}selected{% endif %}>Agosto</option>
+            <option value="9" {% if selected_month == 9 %}selected{% endif %}>Setembro</option>
+            <option value="10" {% if selected_month == 10 %}selected{% endif %}>Outubro</option>
+            <option value="11" {% if selected_month == 11 %}selected{% endif %}>Novembro</option>
+            <option value="12" {% if selected_month == 12 %}selected{% endif %}>Dezembro</option>
+        </select>
+        <select name="year" class="form-select form-select-sm me-2" style="width: 100px;">
+            <option value="">Todos os Anos</option>
+            {% for y in years %}
+            <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm btn-outline-primary"><i class="fas fa-filter"></i> Filtrar</button>
+        </form>
+    </div>
 </div>
 
 <div class="row g-4 mb-5">
@@ -24,6 +55,23 @@
         <div class="card p-4 border-start border-primary border-4 bg-primary bg-opacity-10">
             <h6 class="text-primary text-uppercase fw-bold small">Saldo Atual</h6>
             <h3 class="fw-bold text-primary mb-0">R$ {{ "%.2f"|format(saldo) }}</h3>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-success">
+                    <i class="fas fa-chart-line me-2"></i>Fluxo de Caixa Mensal - Ano Base {{ chart_year }}
+                </h6>
+            </div>
+            <div class="card-body">
+                <div style="height: 300px; width: 100%;">
+                    <canvas id="treasuryChart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -190,4 +238,93 @@
     </div>
 </div>
 {% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    Chart.register(ChartDataLabels);
+    
+    var ctx = document.getElementById('treasuryChart');
+    if (ctx) {
+        var treasuryChart = new Chart(ctx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: {{ chart_labels | tojson }},
+                datasets: [
+                    {
+                        label: 'Entradas (R$)',
+                        data: {{ chart_data.entradas | tojson }},
+                        borderColor: '#1cc88a',
+                        backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#1cc88a',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#1cc88a',
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Saídas (R$)',
+                        data: {{ chart_data.saidas | tojson }},
+                        borderColor: '#e74a3b',
+                        backgroundColor: 'rgba(231, 74, 59, 0.1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#e74a3b',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#e74a3b',
+                        fill: true,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                maintainAspectRatio: false,
+                layout: {
+                    padding: { top: 30 }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false }
+                    },
+                    y: {
+                        display: false // Removendo eixo y conforme solicitado
+                    }
+                },
+                plugins: {
+                    datalabels: {
+                        align: 'end',
+                        anchor: 'end',
+                        color: function(context) {
+                            return context.dataset.borderColor;
+                        },
+                        font: { size: 10, weight: 'bold' },
+                        formatter: function(value) {
+                            if (value === 0 || value === null) return '';
+                            return 'R$ ' + value.toFixed(2);
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += 'R$ ' + context.parsed.y.toFixed(2);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

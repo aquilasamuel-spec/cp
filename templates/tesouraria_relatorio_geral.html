@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Tesouraria</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
+        .print-container { background: white; max-width: 1000px; margin: 20px auto; padding: 40px; box-shadow: 0 0 20px rgba(0,0,0,0.05); border-radius: 12px; }
+        .data-table th, .data-table td { font-size: 13px; vertical-align: middle; }
+        @media print {
+            body { background: white; }
+            .print-container { padding: 0; box-shadow: none; margin: 0; max-width: 100%; border-radius: 0; }
+            .d-print-none { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container my-4 d-flex justify-content-between d-print-none">
+    <a href="{{ url_for('treasury') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Voltar
+    </a>
+    <button id="downloadPdfBtn" class="btn btn-danger">
+        <i class="fas fa-file-pdf me-2"></i>Fazer Download do PDF
+    </button>
+</div>
+
+<div class="print-container" id="pdf-content">
+    
+    <!-- Cabeçalho do PDF -->
+    <div class="text-center border-bottom pb-4 mb-4">
+        <h2 class="text-primary fw-bold mb-1" style="font-size: 28px;">Relatório de Tesouraria</h2>
+        <p class="text-muted mb-0" style="font-size: 16px;">
+            Sistema Cântico Pentecostal - UJAD
+            {% if filtro_text %}
+            <br>
+            <span class="badge bg-light text-secondary mt-2 border">{{ filtro_text }}</span>
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Big Numbers -->
+    <div class="row g-3 mb-4 text-center">
+        <div class="col-4">
+            <div class="p-3 bg-light rounded border border-success border-opacity-25">
+                <span class="d-block text-success fw-bold text-uppercase small mb-1">Total Entradas</span>
+                <span class="fs-4 fw-black text-success">R$ {{ "%.2f"|format(total_entrada) }}</span>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="p-3 bg-light rounded border border-danger border-opacity-25">
+                <span class="d-block text-danger fw-bold text-uppercase small mb-1">Total Saídas</span>
+                <span class="fs-4 fw-black text-danger">R$ {{ "%.2f"|format(total_saida) }}</span>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="p-3 bg-light rounded border border-primary border-opacity-25">
+                <span class="d-block text-primary fw-bold text-uppercase small mb-1">Saldo do Período</span>
+                <span class="fs-4 fw-black text-primary">R$ {{ "%.2f"|format(saldo) }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Transações -->
+    <div class="card border-0 shadow-none">
+        <div class="card-header bg-white px-0 pb-2 border-bottom">
+            <h6 class="m-0 font-weight-bold text-dark">Detalhamento de Transações</h6>
+        </div>
+        <div class="card-body px-0 pt-3">
+            <table class="table table-sm table-bordered data-table mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th>Categoria</th>
+                        <th class="text-end">Valor (R$)</th>
+                        <th>Observação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    <tr>
+                        <td class="text-center" style="width: 100px;">{{ entry.date.strftime('%d/%m/%Y') }}</td>
+                        <td class="text-center" style="width: 100px;">
+                            {% if entry.type == 'Entrada' %}
+                            <span class="text-success fw-bold">Entrada</span>
+                            {% else %}
+                            <span class="text-danger fw-bold">Saída</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ entry.category }}</td>
+                        <td class="text-end fw-bold {% if entry.type == 'Entrada' %}text-success{% else %}text-danger{% endif %}" style="width: 120px;">
+                            {{ "%.2f"|format(entry.amount) }}
+                        </td>
+                        <td class="text-secondary">{{ entry.observation or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not entries %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">Nenhuma transação encontrada para este período.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="text-center mt-5 pt-3 border-top text-muted" style="font-size: 11px;">
+        Gerado automaticamente pelo Sistema CP em {{ today }}
+    </div>
+</div>
+
+<script>
+    document.getElementById('downloadPdfBtn').addEventListener('click', function() {
+        const element = document.getElementById('pdf-content');
+        const opt = {
+            margin:       10,
+            filename:     'relatorio_tesouraria.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        
+        // Exibir loading ou desativar botão temporalmente se desejar
+        html2pdf().set(opt).from(element).save();
+    });
+</script>
+
+</body>
+</html>

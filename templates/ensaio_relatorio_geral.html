@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Include html2pdf.js via CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3 mb-0 text-gray-800" style="font-family: 'Inter', sans-serif; font-weight: 700;">
+        <i class="fas fa-file-alt text-danger me-2"></i> Relatório Geral de Presenças
+    </h2>
+    <div>
+        <button id="downloadPdfBtn" class="btn btn-danger shadow-sm me-2">
+            <i class="fas fa-file-pdf fa-sm me-1"></i> Baixar PDF
+        </button>
+        <a href="{{ url_for('ensaios_list') }}" class="btn btn-outline-secondary shadow-sm">
+            <i class="fas fa-arrow-left fa-sm me-1"></i> Voltar
+        </a>
+    </div>
+</div>
+
+<div id="pdf-content" class="bg-white p-4 rounded shadow-sm" style="font-family: 'Inter', sans-serif;">
+    <!-- Cabeçalho do PDF -->
+    <div class="text-center border-bottom pb-4 mb-4">
+        <h2 class="text-primary fw-bold mb-1" style="font-size: 28px;">Relatório Consolidado de Ensaios</h2>
+        <p class="text-muted mb-0" style="font-size: 16px;">
+            Sistema Cântico Pentecostal - UJAD
+            {% if filtro_text %}
+            <br>
+            <span class="badge bg-light text-secondary mt-2 border">{{ filtro_text }}</span>
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Resumo / Big Numbers -->
+    <div class="row text-center mb-5">
+        <div class="col-md-3 mb-3 mb-md-0">
+            <div class="card bg-light border-0 py-3 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-muted fw-bold mb-1" style="font-size: 11px; letter-spacing: 1px;">Ensaios Realizados</h6>
+                    <h2 class="display-5 fw-bold text-dark mb-0">{{ total_ensaios }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3 mb-md-0">
+            <div class="card border-0 py-3 shadow-sm h-100" style="background-color: rgba(28, 200, 138, 0.1);">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-success fw-bold mb-1" style="font-size: 11px; letter-spacing: 1px;">Total de Presenças</h6>
+                    <h2 class="display-5 fw-bold text-success mb-0">{{ total_presencas }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3 mb-md-0">
+            <div class="card border-0 py-3 shadow-sm h-100" style="background-color: rgba(231, 74, 59, 0.1);">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-danger fw-bold mb-1" style="font-size: 11px; letter-spacing: 1px;">Total de Faltas</h6>
+                    <h2 class="display-5 fw-bold text-danger mb-0">{{ total_ausencias }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white border-0 py-3 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-white-50 fw-bold mb-1" style="font-size: 11px; letter-spacing: 1px;">Taxa Média de Presença</h6>
+                    <h2 class="display-5 fw-bold mb-0">{{ taxa_presenca }}<span style="font-size: 20px;">%</span></h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela Matrix -->
+    <h5 class="fw-bold text-gray-800 mb-3 border-bottom pb-2" style="font-size: 18px;">Quadro Analítico por Componente</h5>
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm text-center align-middle" style="font-size: 12px;">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-start" style="min-width: 150px;">Componente</th>
+                    {% for e in ensaios %}
+                    <th style="min-width: 45px;"><span style="font-size: 10px; display: block; line-height: 1;">{{ e.date.strftime('%d/%m') }}</span><span style="font-size: 9px; color: #888;">{{ e.date.year }}</span></th>
+                    {% endfor %}
+                    <th class="table-success" style="width: 50px;">P</th>
+                    <th class="table-danger" style="width: 50px;">F</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in members %}
+                <tr>
+                    <td class="text-start fw-bold text-gray-800">{{ m.nome }}</td>
+                    {% for e in ensaios %}
+                        {% set status = m.marcacoes[e.id] %}
+                        {% if status == 'V' %}
+                        <td class="text-success fw-bold">✓</td>
+                        {% elif status == 'X' %}
+                        <td class="text-danger fw-bold">✕</td>
+                        {% else %}
+                        <td class="text-muted">-</td>
+                        {% endif %}
+                    {% endfor %}
+                    <td class="table-success fw-bold">{{ m.presencas }}</td>
+                    <td class="table-danger fw-bold">{{ m.faltas }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="mt-4 text-end text-muted" style="font-size: 10px;">
+        Legenda: <span class="text-success fw-bold mx-1">✓ Presente</span> | <span class="text-danger fw-bold mx-1">✕ Ausente</span> | <span class="mx-1">- Não Marcado/Recente</span><br>
+        Relatório gerado em {{ now().strftime('%d/%m/%Y %H:%M') if now else 'Hoje' }}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('downloadPdfBtn').addEventListener('click', function() {
+        const element = document.getElementById('pdf-content');
+        const opt = {
+            margin:       [10, 10, 10, 10], // top, left, bottom, right
+            filename:     'relatorio_geral_ensaios.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } // Landscape para caber as colunas
+        };
+
+        html2pdf().set(opt).from(element).save();
+    });
+});
+</script>
+{% endblock %}

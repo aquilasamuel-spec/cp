@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3 mb-0 text-gray-800">
+        <i class="fas {% if ensaio %}fa-edit{% else %}fa-plus-circle{% endif %} text-primary me-2"></i> {% if ensaio %}Editar Ensaio{% else %}Registrar Ensaio{% endif %}
+    </h2>
+    <a href="{{ url_for('view_ensaio', id=ensaio.id) if ensaio else url_for('ensaios_list') }}" class="btn btn-outline-secondary shadow-sm">
+        <i class="fas fa-arrow-left fa-sm me-1"></i> Voltar
+    </a>
+</div>
+
+<div class="card shadow mb-4 border-0">
+    <div class="card-body">
+        <form action="{{ url_for('edit_ensaio', id=ensaio.id) if ensaio else url_for('new_ensaio') }}" method="POST" id="ensaioForm">
+            <!-- Header do Form com Data -->
+            <div class="row mb-4 align-items-center">
+                <div class="col-md-4">
+                    <label for="data" class="form-label fw-bold">Data do Ensaio</label>
+                    <input type="date" class="form-control" id="data" name="data" value="{{ ensaio.date.strftime('%Y-%m-%d') if ensaio else today }}" required>
+                </div>
+                <div class="col-md-8 text-end mt-4 mt-md-0">
+                    <span class="text-muted small me-3"><i class="fas fa-info-circle"></i> Marque abaixo quem esteve presente.</span>
+                    <button type="button" class="btn btn-sm btn-outline-success me-2" id="selectAll">Selecionar Todos</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="deselectAll">Limpar Tudo</button>
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- Lista de Membros para Chamada -->
+            <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                <table class="table table-hover table-sm">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th width="50" class="text-center">#</th>
+                            <th>Membro / Componente</th>
+                            <th>Congregação</th>
+                            <th>Cargo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in members if m.Nome %}
+                        <tr>
+                            <td class="text-center align-middle">
+                                <div class="form-check d-flex justify-content-center">
+                                    <input class="form-check-input attendance-checkbox" type="checkbox" name="presente" value="{{ m.Nome }}" id="chk_{{ loop.index }}" style="width: 20px; height: 20px;" {% if ensaio and m.Nome in presentes_nomes %}checked{% endif %}>
+                                </div>
+                            </td>
+                            <td>
+                                <label class="form-check-label w-100 d-block cursor-pointer py-1" for="chk_{{ loop.index }}">
+                                    <strong>{{ m.Nome }}</strong>
+                                </label>
+                            </td>
+                            <td class="align-middle text-muted">{{ m.Congregação }}</td>
+                            <td class="align-middle text-muted small">{{ m.Cargo }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="text-end mt-4">
+                <button type="submit" class="btn btn-primary px-5 btn-lg shadow-sm">
+                    <i class="fas fa-save me-1"></i> {% if ensaio %}Salvar Alterações{% else %}Salvar Chamada{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllBtn = document.getElementById('selectAll');
+    const deselectAllBtn = document.getElementById('deselectAll');
+    const checkboxes = document.querySelectorAll('.attendance-checkbox');
+
+    selectAllBtn.addEventListener('click', function() {
+        checkboxes.forEach(chk => chk.checked = true);
+    });
+
+    deselectAllBtn.addEventListener('click', function() {
+        checkboxes.forEach(chk => chk.checked = false);
+    });
+});
+</script>
+{% endblock %}

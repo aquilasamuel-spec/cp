@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3 mb-0 text-gray-800" style="font-family: 'Inter', sans-serif; font-weight: 700;">
+        <i class="fas fa-music text-primary me-2"></i> Ensaios
+    </h2>
+    <div>
+        <a href="{{ url_for('relatorio_geral_ensaios', month=selected_month, year=selected_year) }}" class="btn btn-danger shadow-sm me-2">
+            <i class="fas fa-file-pdf fa-sm me-1"></i> Baixar Relatório (PDF)
+        </a>
+        <a href="{{ url_for('new_ensaio') }}" class="btn btn-primary shadow-sm">
+            <i class="fas fa-plus fa-sm text-white-50 me-1"></i> Novo Ensaio
+        </a>
+    </div>
+</div>
+
+<div class="card shadow mb-4 border-0">
+    <div class="card-header py-3 bg-white d-flex flex-column flex-md-row align-items-md-center justify-content-between">
+        <h6 class="m-0 font-weight-bold text-primary mb-3 mb-md-0">Histórico de Ensaios</h6>
+        <form method="GET" action="{{ url_for('ensaios_list') }}" class="d-flex align-items-center">
+            <select name="month" class="form-select form-select-sm me-2" style="width: 140px;">
+                <option value="">Todos os Meses</option>
+                <option value="1" {% if selected_month == 1 %}selected{% endif %}>Janeiro</option>
+                <option value="2" {% if selected_month == 2 %}selected{% endif %}>Fevereiro</option>
+                <option value="3" {% if selected_month == 3 %}selected{% endif %}>Março</option>
+                <option value="4" {% if selected_month == 4 %}selected{% endif %}>Abril</option>
+                <option value="5" {% if selected_month == 5 %}selected{% endif %}>Maio</option>
+                <option value="6" {% if selected_month == 6 %}selected{% endif %}>Junho</option>
+                <option value="7" {% if selected_month == 7 %}selected{% endif %}>Julho</option>
+                <option value="8" {% if selected_month == 8 %}selected{% endif %}>Agosto</option>
+                <option value="9" {% if selected_month == 9 %}selected{% endif %}>Setembro</option>
+                <option value="10" {% if selected_month == 10 %}selected{% endif %}>Outubro</option>
+                <option value="11" {% if selected_month == 11 %}selected{% endif %}>Novembro</option>
+                <option value="12" {% if selected_month == 12 %}selected{% endif %}>Dezembro</option>
+            </select>
+            <select name="year" class="form-select form-select-sm me-2" style="width: 100px;">
+                <option value="">Todos os Anos</option>
+                {% for y in years %}
+                <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-primary"><i class="fas fa-filter"></i> Filtrar</button>
+        </form>
+    </div>
+    <div class="card-body">
+        {% if ensaios %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data</th>
+                        <th class="text-center">Presentes</th>
+                        <th class="text-center">Ausentes</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in ensaios %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold">
+                                <i class="far fa-calendar-alt text-muted me-2"></i>
+                                {{ item.ensaio.date.strftime('%d/%m/%Y') }}
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-success rounded-pill px-3 py-2">
+                                <i class="fas fa-check me-1"></i> {{ item.presentes }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-danger rounded-pill px-3 py-2">
+                                <i class="fas fa-times me-1"></i> {{ item.ausentes }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('view_ensaio', id=item.ensaio.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i> Visualizar
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+            <i class="fas fa-music fa-3x mb-3 text-gray-300"></i>
+            <p>Nenhum ensaio registrado ainda.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
