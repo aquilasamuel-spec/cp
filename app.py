@@ -1,6 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import db, User, TreasuryEntry
+from models import db, User, TreasuryEntry, Rehearsal, RehearsalAttendance
 from services.excel_service import get_birthdays_of_month, get_members_data, update_member_data, add_member, delete_member
 from services.whatsapp_service import send_whatsapp_message
 from functools import wraps
@@ -169,7 +169,7 @@ def members():
 
 @app.route('/membros/novo', methods=['POST'])
 @login_required
-@roles_required(['master', 'secretario'])
+@roles_required(['master', 'coordenador', 'secretario'])
 def new_member():
     data = {
         'Nome': request.form.get('nome'),
@@ -189,7 +189,7 @@ def new_member():
 
 @app.route('/membros/editar', methods=['POST'])
 @login_required
-@roles_required(['master', 'secretario'])
+@roles_required(['master', 'coordenador', 'secretario'])
 def edit_member():
     original_name = request.form.get('original_name')
     new_data = {
@@ -210,7 +210,7 @@ def edit_member():
 
 @app.route('/membros/excluir/<path:nome>', methods=['POST'])
 @login_required
-@roles_required(['master', 'secretario'])
+@roles_required(['master', 'coordenador', 'secretario'])
 def remove_member(nome):
     if delete_member(nome):
         flash('Membro excluído com sucesso!', 'success')
@@ -223,16 +223,105 @@ def remove_member(nome):
 @login_required
 @roles_required(['master', 'coordenador', 'tesoureiro'])
 def treasury():
-    entries = TreasuryEntry.query.order_by(TreasuryEntry.date.desc()).all()
-    total_entrada = db.session.query(db.func.sum(TreasuryEntry.amount)).filter(TreasuryEntry.type == 'Entrada').scalar() or 0
-    total_saida = db.session.query(db.func.sum(TreasuryEntry.amount)).filter(TreasuryEntry.type == 'Saída').scalar() or 0
+    month = request.args.get('month', type=int)
+    year = request.args.get('year', type=int)
+    
+    all_entries = TreasuryEntry.query.order_by(TreasuryEntry.date.desc()).all()
+    
+    current_year = datetime.now().year
+    chart_year = year if year else current_year
+    
+    if month:
+        import calendar
+        num_days = calendar.monthrange(chart_year, month)[1]
+        chart_labels = [str(d) for d in range(1, num_days + 1)]
+        chart_data = {'entradas': [0]*num_days, 'saidas': [0]*num_days}
+        
+        for e in all_entries:
+            if e.date.year == chart_year and e.date.month == month:
+                idx = e.date.day - 1
+                if e.type == 'Entrada':
+                    chart_data['entradas'][idx] += e.amount
+                elif e.type == 'Saída':
+                    chart_data['saidas'][idx] += e.amount
+    else:
+        chart_labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+        chart_data = {'entradas': [0]*12, 'saidas': [0]*12}
+        
+        for e in all_entries:
+            if e.date.year == chart_year:
+                idx = e.date.month - 1
+                if e.type == 'Entrada':
+                    chart_data['entradas'][idx] += e.amount
+                elif e.type == 'Saída':
+                    chart_data['saidas'][idx] += e.amount
+                
+    if month:
+        all_entries = [e for e in all_entries if e.date.month == month]
+    if year:
+        all_entries = [e for e in all_entries if e.date.year == year]
+        
+    total_entrada = sum(e.amount for e in all_entries if e.type == 'Entrada')
+    total_saida = sum(e.amount for e in all_entries if e.type == 'Saída')
     saldo = total_entrada - total_saida
     
-    return render_template('treasury.html', entries=entries, total_entrada=total_entrada, total_saida=total_saida, saldo=saldo, today=datetime.now().strftime('%Y-%m-%d'))
+    years = range(current_year - 2, current_year + 2)
+    
+    return render_template('treasury.html', 
+                           entries=all_entries, 
+                           total_entrada=total_entrada, 
+                           total_saida=total_saida, 
+                           saldo=saldo, 
+                           today=datetime.now().strftime('%Y-%m-%d'),
+                           selected_month=month,
+                           selected_year=year,
+                           chart_year=chart_year,
+                           years=years,
+                           chart_data=chart_data,
+                           chart_labels=chart_labels)
+
+@app.route('/tesouraria/relatorio_geral')
+@login_required
+@roles_required(['master', 'coordenador', 'tesoureiro'])
+def relatorio_geral_tesouraria():
+    month = request.args.get('month', type=int)
+    year = request.args.get('year', type=int)
+    
+    all_entries = TreasuryEntry.query.order_by(TreasuryEntry.date.asc()).all()
+    
+    if month:
+        all_entries = [e for e in all_entries if e.date.month == month]
+    if year:
+        all_entries = [e for e in all_entries if e.date.year == year]
+        
+    total_entrada = sum(e.amount for e in all_entries if e.type == 'Entrada')
+    total_saida = sum(e.amount for e in all_entries if e.type == 'Saída')
+    saldo = total_entrada - total_saida
+    
+    meses_dict = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    
+    filtro_text = ""
+    if month and year:
+        filtro_text = f"Filtro aplicado: {meses_dict.get(month, '')} de {year}"
+    elif month:
+        filtro_text = f"Filtro aplicado: {meses_dict.get(month, '')}"
+    elif year:
+        filtro_text = f"Filtro aplicado: Ano de {year}"
+        
+    return render_template('tesouraria_relatorio_geral.html', 
+                           entries=all_entries, 
+                           total_entrada=total_entrada, 
+                           total_saida=total_saida, 
+                           saldo=saldo,
+                           filtro_text=filtro_text)
 
 @app.route('/tesouraria/salvar', methods=['POST'])
 @login_required
-@roles_required(['master', 'tesoureiro'])
+@roles_required(['master', 'coordenador', 'tesoureiro'])
 def save_treasury():
     try:
         valor = request.form.get('valor').replace(',', '.')
@@ -254,7 +343,7 @@ def save_treasury():
 
 @app.route('/tesouraria/editar/<int:id>', methods=['POST'])
 @login_required
-@roles_required(['master', 'tesoureiro'])
+@roles_required(['master', 'coordenador', 'tesoureiro'])
 def edit_treasury(id):
     entry = TreasuryEntry.query.get_or_404(id)
     try:
@@ -274,7 +363,7 @@ def edit_treasury(id):
 
 @app.route('/tesouraria/excluir/<int:id>', methods=['POST'])
 @login_required
-@roles_required(['master', 'tesoureiro'])
+@roles_required(['master', 'coordenador', 'tesoureiro'])
 def delete_treasury(id):
     entry = TreasuryEntry.query.get_or_404(id)
     try:
@@ -288,14 +377,14 @@ def delete_treasury(id):
 
 @app.route('/admin/acessos')
 @login_required
-@roles_required(['master'])
+@roles_required(['master', 'coordenador'])
 def access_management():
     users = User.query.all()
     return render_template('access_management.html', users=users)
 
 @app.route('/admin/acessos/salvar', methods=['POST'])
 @login_required
-@roles_required(['master'])
+@roles_required(['master', 'coordenador'])
 def save_access():
     username = request.form.get('username')
     password = request.form.get('password')
@@ -323,7 +412,7 @@ def save_access():
 
 @app.route('/admin/acessos/excluir/<int:id>')
 @login_required
-@roles_required(['master'])
+@roles_required(['master', 'coordenador'])
 def delete_access(id):
     user = User.query.get_or_404(id)
     if user.username == 'admin':
@@ -391,6 +480,263 @@ def notify_leaders_today():
         return jsonify({'success': success, 'message': message})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/ensaios')
+@login_required
+@roles_required(['master', 'lider_jovens', 'coordenador', 'secretario'])
+def ensaios_list():
+    month = request.args.get('month', type=int)
+    year = request.args.get('year', type=int)
+    
+    ensaios = Rehearsal.query.order_by(Rehearsal.date.desc()).all()
+    
+    if month:
+        ensaios = [e for e in ensaios if e.date.month == month]
+    if year:
+        ensaios = [e for e in ensaios if e.date.year == year]
+        
+    ensaios_data = []
+    for ensaio in ensaios:
+        presentes = RehearsalAttendance.query.filter_by(rehearsal_id=ensaio.id, is_present=True).count()
+        ausentes = RehearsalAttendance.query.filter_by(rehearsal_id=ensaio.id, is_present=False).count()
+        ensaios_data.append({
+            'ensaio': ensaio,
+            'presentes': presentes,
+            'ausentes': ausentes
+        })
+    
+    current_year = datetime.now().year
+    years = range(current_year - 2, current_year + 2)    
+        
+    return render_template('ensaios.html', ensaios=ensaios_data, selected_month=month, selected_year=year, years=years)
+
+@app.route('/ensaios/novo', methods=['GET', 'POST'])
+@login_required
+@roles_required(['master', 'lider_jovens', 'coordenador', 'secretario'])
+def new_ensaio():
+    members = get_members_data()
+    # Ordenar membros
+    members = sorted(members, key=lambda x: str(x.get('Nome', '')))
+    
+    if request.method == 'POST':
+        data_str = request.form.get('data')
+        try:
+            ensaio_date = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except:
+            flash('Data inválida.', 'danger')
+            return redirect(url_for('new_ensaio'))
+            
+        new_rehearsal = Rehearsal(date=ensaio_date, created_by=current_user.id)
+        db.session.add(new_rehearsal)
+        db.session.commit()
+        
+        presentes_nomes = request.form.getlist('presente')
+        
+        for m in members:
+            nome = m.get('Nome', '')
+            if not nome: continue
+            is_present = nome in presentes_nomes
+            att = RehearsalAttendance(rehearsal_id=new_rehearsal.id, member_name=nome, is_present=is_present)
+            db.session.add(att)
+            
+        db.session.commit()
+        flash('Ensaio registrado com sucesso!', 'success')
+        return redirect(url_for('ensaios_list'))
+        
+    return render_template('ensaio_form.html', members=members, today=datetime.now().strftime('%Y-%m-%d'))
+
+@app.route('/ensaios/<int:id>')
+@login_required
+@roles_required(['master', 'lider_jovens', 'coordenador', 'secretario'])
+def view_ensaio(id):
+    ensaio = Rehearsal.query.get_or_404(id)
+    attendances = RehearsalAttendance.query.filter_by(rehearsal_id=id).all()
+    
+    presentes = [a for a in attendances if a.is_present]
+    ausentes = [a for a in attendances if not a.is_present]
+    
+    creator = User.query.get(ensaio.created_by)
+    creator_name = creator.username if creator else 'Desconhecido'
+    
+    return render_template('ensaio_view.html', 
+                           ensaio=ensaio, 
+                           presentes=presentes, 
+                           ausentes=ausentes,
+                           creator_name=creator_name)
+
+@app.route('/ensaios/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+@roles_required(['master', 'lider_jovens', 'coordenador', 'secretario'])
+def edit_ensaio(id):
+    ensaio = Rehearsal.query.get_or_404(id)
+    members = get_members_data()
+    members = sorted(members, key=lambda x: str(x.get('Nome', '')))
+    
+    if request.method == 'POST':
+        data_str = request.form.get('data')
+        try:
+            ensaio.date = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except:
+            flash('Data inválida.', 'danger')
+            return redirect(url_for('edit_ensaio', id=id))
+            
+        db.session.commit()
+        
+        # Limpar chamadas antigas
+        RehearsalAttendance.query.filter_by(rehearsal_id=ensaio.id).delete()
+        
+        presentes_nomes = request.form.getlist('presente')
+        
+        for m in members:
+            nome = m.get('Nome', '')
+            if not nome: continue
+            is_present = nome in presentes_nomes
+            att = RehearsalAttendance(rehearsal_id=ensaio.id, member_name=nome, is_present=is_present)
+            db.session.add(att)
+            
+        db.session.commit()
+        flash('Ensaio atualizado com sucesso!', 'success')
+        return redirect(url_for('view_ensaio', id=ensaio.id))
+        
+    old_attendances = RehearsalAttendance.query.filter_by(rehearsal_id=ensaio.id, is_present=True).all()
+    presentes_nomes = [a.member_name for a in old_attendances]
+    return render_template('ensaio_form.html', members=members, ensaio=ensaio, presentes_nomes=presentes_nomes)
+
+@app.route('/ensaios/<int:id>/excluir', methods=['POST'])
+@login_required
+@roles_required(['master', 'lider_jovens', 'coordenador', 'secretario'])
+def delete_ensaio(id):
+    ensaio = Rehearsal.query.get_or_404(id)
+    RehearsalAttendance.query.filter_by(rehearsal_id=id).delete()
+    db.session.delete(ensaio)
+    db.session.commit()
+    flash('Ensaio excluído com sucesso!', 'success')
+    return redirect(url_for('ensaios_list'))
+
+@app.route('/ensaios/<int:id>/notificar_ausentes', methods=['POST'])
+@login_required
+@roles_required(['master', 'lider_jovens', 'coordenador'])
+def notify_ausentes(id):
+    ensaio = Rehearsal.query.get_or_404(id)
+    attendances = RehearsalAttendance.query.filter_by(rehearsal_id=id, is_present=False).all()
+    ausentes_nomes = [a.member_name for a in attendances]
+    
+    members = get_members_data()
+    enviados = 0
+    
+    ensaio_data_str = ensaio.date.strftime('%d/%m/%Y')
+    mensagem = f"A Paz do Senhor! Sentimos a sua falta no ensaio de {ensaio_data_str}. Você é muito importante para nós! Esperamos te ver no próximo! 🙌"
+    
+    for m in members:
+        if m.get('Nome') in ausentes_nomes and m.get('Telefone'):
+            phone = str(m['Telefone'])
+            success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
+            if success: enviados += 1
+            
+    flash(f'Mensagens enviadas para {enviados} ausentes!', 'success')
+    return redirect(url_for('view_ensaio', id=id))
+
+@app.route('/ensaios/<int:id>/notificar_presentes', methods=['POST'])
+@login_required
+@roles_required(['master', 'lider_jovens', 'coordenador'])
+def notify_presentes(id):
+    ensaio = Rehearsal.query.get_or_404(id)
+    attendances = RehearsalAttendance.query.filter_by(rehearsal_id=id, is_present=True).all()
+    presentes_nomes = [a.member_name for a in attendances]
+    
+    members = get_members_data()
+    enviados = 0
+    
+    ensaio_data_str = ensaio.date.strftime('%d/%m/%Y')
+    mensagem = f"A Paz do Senhor! Passando para agradecer a Deus pela sua vida e pela sua presença no ensaio de {ensaio_data_str}. Vocês são muito importantes! 🙏"
+    
+    for m in members:
+        if m.get('Nome') in presentes_nomes and m.get('Telefone'):
+            phone = str(m['Telefone'])
+            success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
+            if success: enviados += 1
+            
+    flash(f'Mensagens enviadas para {enviados} presentes!', 'success')
+    return redirect(url_for('view_ensaio', id=id))
+
+@app.route('/ensaios/relatorio_geral')
+@login_required
+@roles_required(['master', 'lider_jovens', 'coordenador', 'secretario'])
+def relatorio_geral_ensaios():
+    month = request.args.get('month', type=int)
+    year = request.args.get('year', type=int)
+    
+    ensaios = Rehearsal.query.order_by(Rehearsal.date.asc()).all()
+    
+    if month:
+        ensaios = [e for e in ensaios if e.date.month == month]
+    if year:
+        ensaios = [e for e in ensaios if e.date.year == year]
+        
+    ensaio_ids = [e.id for e in ensaios]
+    if not ensaio_ids:
+        attendances = []
+    else:
+        attendances = RehearsalAttendance.query.filter(RehearsalAttendance.rehearsal_id.in_(ensaio_ids)).all()
+    
+    members_data = {}
+    total_presencas = 0
+    total_ausencias = 0
+    
+    for att in attendances:
+        if att.member_name not in members_data:
+            members_data[att.member_name] = {}
+        members_data[att.member_name][att.rehearsal_id] = att.is_present
+        if att.is_present:
+            total_presencas += 1
+        else:
+            total_ausencias += 1
+            
+    total_ensaios = len(ensaios)
+    total_marcacoes = total_presencas + total_ausencias
+    taxa_presenca = (total_presencas / total_marcacoes * 100) if total_marcacoes > 0 else 0
+    
+    active_membros = get_members_data()
+    active_names = [m.get('Nome') for m in active_membros if m.get('Nome')]
+    
+    all_names = set(list(members_data.keys()) + active_names)
+    members_list = []
+    
+    for name in sorted(list(all_names)):
+        presences_for_member = members_data.get(name, {})
+        row = {'nome': name, 'presencas': 0, 'faltas': 0, 'marcacoes': {}}
+        for e in ensaios:
+            if e.id in presences_for_member:
+                is_p = presences_for_member[e.id]
+                row['marcacoes'][e.id] = "V" if is_p else "X"
+                if is_p: row['presencas'] += 1
+                else: row['faltas'] += 1
+            else:
+                row['marcacoes'][e.id] = "-"
+        members_list.append(row)
+
+    meses_dict = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    
+    filtro_text = ""
+    if month and year:
+        filtro_text = f"Filtro aplicado: {meses_dict.get(month, '')} de {year}"
+    elif month:
+        filtro_text = f"Filtro aplicado: {meses_dict.get(month, '')}"
+    elif year:
+        filtro_text = f"Filtro aplicado: Ano de {year}"
+        
+    return render_template('ensaio_relatorio_geral.html', 
+                           ensaios=ensaios, 
+                           members=members_list, 
+                           total_ensaios=total_ensaios,
+                           total_presencas=total_presencas,
+                           total_ausencias=total_ausencias,
+                           taxa_presenca=round(taxa_presenca, 1),
+                           filtro_text=filtro_text)
 
 @app.errorhandler(403)
 def forbidden(e):
