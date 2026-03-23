@@ -617,23 +617,44 @@ def delete_ensaio(id):
 @login_required
 @roles_required(['master', 'lider_jovens', 'coordenador'])
 def notify_ausentes(id):
+    import time
+    from services.whatsapp_service import send_whatsapp_message
+    
     ensaio = Rehearsal.query.get_or_404(id)
     attendances = RehearsalAttendance.query.filter_by(rehearsal_id=id, is_present=False).all()
     ausentes_nomes = [a.member_name for a in attendances]
     
     members = get_members_data()
-    enviados = 0
     
     ensaio_data_str = ensaio.date.strftime('%d/%m/%Y')
     mensagem = f"A Paz do Senhor! Sentimos a sua falta no ensaio de {ensaio_data_str}. Você é muito importante para nós! Esperamos te ver no próximo! 🙌"
     
+    enviados_nomes = []
+    falhas_nomes = []
+    
     for m in members:
-        if m.get('Nome') in ausentes_nomes and m.get('Telefone'):
-            phone = str(m['Telefone'])
-            success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
-            if success: enviados += 1
+        nome = m.get('Nome')
+        if nome in ausentes_nomes:
+            if m.get('Telefone'):
+                phone = str(m['Telefone'])
+                success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
+                if success:
+                    enviados_nomes.append(nome)
+                    time.sleep(10)
+                else:
+                    falhas_nomes.append(nome)
+            else:
+                falhas_nomes.append(f"{nome} (Sem telefone)")
+    
+    msg_flash = ""
+    if enviados_nomes:
+        msg_flash += f"Enviado para: {', '.join(enviados_nomes)}. "
+    if falhas_nomes:
+        msg_flash += f"Não enviado para: {', '.join(falhas_nomes)}."
+    if not msg_flash:
+        msg_flash = "Nenhum membro encontrado ou notificado."
             
-    flash(f'Mensagens enviadas para {enviados} ausentes!', 'success')
+    flash(msg_flash, 'info')
     return redirect(url_for('view_ensaio', id=id))
 
 @app.route('/ensaios/<int:id>/notificar_presentes', methods=['POST'])
@@ -650,13 +671,34 @@ def notify_presentes(id):
     ensaio_data_str = ensaio.date.strftime('%d/%m/%Y')
     mensagem = f"A Paz do Senhor! Passando para agradecer a Deus pela sua vida e pela sua presença no ensaio de {ensaio_data_str}. Vocês são muito importantes! 🙏"
     
+    enviados_nomes = []
+    falhas_nomes = []
+    import time
+    from services.whatsapp_service import send_whatsapp_message
+    
     for m in members:
-        if m.get('Nome') in presentes_nomes and m.get('Telefone'):
-            phone = str(m['Telefone'])
-            success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
-            if success: enviados += 1
+        nome = m.get('Nome')
+        if nome in presentes_nomes:
+            if m.get('Telefone'):
+                phone = str(m['Telefone'])
+                success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
+                if success:
+                    enviados_nomes.append(nome)
+                    time.sleep(10)
+                else:
+                    falhas_nomes.append(nome)
+            else:
+                falhas_nomes.append(f"{nome} (Sem telefone)")
+    
+    msg_flash = ""
+    if enviados_nomes:
+        msg_flash += f"Enviado para: {', '.join(enviados_nomes)}. "
+    if falhas_nomes:
+        msg_flash += f"Não enviado para: {', '.join(falhas_nomes)}."
+    if not msg_flash:
+        msg_flash = "Nenhum membro encontrado ou notificado."
             
-    flash(f'Mensagens enviadas para {enviados} presentes!', 'success')
+    flash(msg_flash, 'info')
     return redirect(url_for('view_ensaio', id=id))
 
 @app.route('/ensaios/relatorio_geral')
