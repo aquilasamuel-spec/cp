@@ -204,8 +204,12 @@ def update_member_data(member_name, new_data):
         return False
 
 def delete_member(member_name):
-    """Remove um membro do arquivo ativo."""
+    """Remove um membro dos arquivos de dados."""
     try:
+        target_name = str(member_name).strip().upper()
+        deleted_any = False
+        
+        # ACTIVE_FILE
         if os.path.exists(ACTIVE_FILE):
             df = pd.read_excel(ACTIVE_FILE)
             df.columns = [c.upper() for c in df.columns]
@@ -214,19 +218,28 @@ def delete_member(member_name):
             df = pd.DataFrame([ {c.upper(): m.get(c.capitalize(), "") for c in ['NOME', 'DATA DE NASCIMENTO', 'SEXO', 'CIDADE', 'FUNÇÃO', 'TELEFONE']} for m in members])
         
         df['NOME_TMP'] = df['NOME'].astype(str).str.strip().str.upper()
-        target_name = str(member_name).strip().upper()
         mask = df['NOME_TMP'] == target_name
         
-        if not mask.any():
-            return False
+        if mask.any():
+            df = df[~mask]
+            df = df.drop(columns=['NOME_TMP'])
+            save_active_data(df)
+            deleted_any = True
             
-        # Filtra removendo a linha encontrada
-        df = df[~mask]
-        
-        # Remove coluna temporária e salva
-        df = df.drop(columns=['NOME_TMP'])
-        save_active_data(df)
-        return True
+        # PRIMARY_FILE
+        if os.path.exists(PRIMARY_FILE):
+            df_primary = pd.read_excel(PRIMARY_FILE)
+            col_nome = get_best_col(df_primary, 'NOME')
+            if col_nome in df_primary.columns:
+                df_primary['NOME_TMP'] = df_primary[col_nome].astype(str).str.strip().str.upper()
+                mask_primary = df_primary['NOME_TMP'] == target_name
+                if mask_primary.any():
+                    df_primary = df_primary[~mask_primary]
+                    df_primary = df_primary.drop(columns=['NOME_TMP'])
+                    df_primary.to_excel(PRIMARY_FILE, index=False)
+                    deleted_any = True
+                    
+        return deleted_any
     except Exception as e:
         print(f"Erro ao excluir membro: {e}")
         return False

@@ -84,6 +84,7 @@ def run_automation():
     # 3. Enviar para cada líder
     success_count = 0
     errors = []
+    import time
     for leader_phone in leader_phones:
         success, result = send_whatsapp_message(leader_phone, text)
         if success:
@@ -92,6 +93,7 @@ def run_automation():
         else:
             print(f"Falha ao enviar notificação para o líder {leader_phone}: {result}")
             errors.append(f"{leader_phone}: {result}")
+        time.sleep(10)
             
     if success_count > 0:
         return True, f"Notificações enviadas com sucesso para {success_count} líder(es)!"
