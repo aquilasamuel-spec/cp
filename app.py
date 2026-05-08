@@ -9,7 +9,7 @@ from datetime import datetime
 import requests
 import threading
 from services.scheduler import run_automation
-
+import random  # Added for random delay in notifications
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default-dev-key')
 
@@ -640,7 +640,8 @@ def notify_ausentes(id):
                 success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
                 if success:
                     enviados_nomes.append(nome)
-                    time.sleep(10)
+                    delay_seconds = random.uniform(5, 30)
+        time.sleep(delay_seconds)
                 else:
                     falhas_nomes.append(nome)
             else:
@@ -684,7 +685,8 @@ def notify_presentes(id):
                 success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
                 if success:
                     enviados_nomes.append(nome)
-                    time.sleep(10)
+                    delay_seconds = random.uniform(5, 30)
+        time.sleep(delay_seconds)
                 else:
                     falhas_nomes.append(nome)
             else:
