@@ -613,13 +613,40 @@ def delete_ensaio(id):
     flash('Ensaio excluído com sucesso!', 'success')
     return redirect(url_for('ensaios_list'))
 
+def process_bulk_whatsapp(members, target_nomes, mensagem):
+    import time
+    import random
+    from services.whatsapp_service import send_whatsapp_message
+    from datetime import datetime
+    
+    print(f"[{datetime.now()}] Iniciando envio em massa para {len(target_nomes)} membros...")
+    enviados_nomes = []
+    falhas_nomes = []
+    
+    for m in members:
+        nome = m.get('Nome')
+        if nome in target_nomes:
+            if m.get('Telefone'):
+                phone = str(m['Telefone'])
+                success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
+                if success:
+                    enviados_nomes.append(nome)
+                else:
+                    falhas_nomes.append(nome)
+                
+                # Delay randomico apenas se tentou enviar (tem telefone)
+                delay_seconds = random.uniform(5, 30)
+                time.sleep(delay_seconds)
+            else:
+                falhas_nomes.append(f"{nome} (Sem telefone)")
+                
+    print(f"[{datetime.now()}] Envio em massa concluido. Enviados: {len(enviados_nomes)}, Falhas: {len(falhas_nomes)}")
+
 @app.route('/ensaios/<int:id>/notificar_ausentes', methods=['POST'])
 @login_required
 @roles_required(['master', 'lider_jovens', 'coordenador'])
 def notify_ausentes(id):
-    import time
-    from services.whatsapp_service import send_whatsapp_message
-    
+    import threading
     ensaio = Rehearsal.query.get_or_404(id)
     attendances = RehearsalAttendance.query.filter_by(rehearsal_id=id, is_present=False).all()
     ausentes_nomes = [a.member_name for a in attendances]
@@ -629,78 +656,28 @@ def notify_ausentes(id):
     ensaio_data_str = ensaio.date.strftime('%d/%m/%Y')
     mensagem = f"A Paz do Senhor! Sentimos a sua falta no ensaio de {ensaio_data_str}. Você é muito importante para nós! Esperamos te ver no próximo! 🙌"
     
-    enviados_nomes = []
-    falhas_nomes = []
+    threading.Thread(target=process_bulk_whatsapp, args=(members, ausentes_nomes, mensagem)).start()
     
-    for m in members:
-        nome = m.get('Nome')
-        if nome in ausentes_nomes:
-            if m.get('Telefone'):
-                phone = str(m['Telefone'])
-                success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
-                if success:
-                    enviados_nomes.append(nome)
-                    delay_seconds = random.uniform(5, 30)
-        time.sleep(delay_seconds)
-                else:
-                    falhas_nomes.append(nome)
-            else:
-                falhas_nomes.append(f"{nome} (Sem telefone)")
-    
-    msg_flash = ""
-    if enviados_nomes:
-        msg_flash += f"Enviado para: {', '.join(enviados_nomes)}. "
-    if falhas_nomes:
-        msg_flash += f"Não enviado para: {', '.join(falhas_nomes)}."
-    if not msg_flash:
-        msg_flash = "Nenhum membro encontrado ou notificado."
-            
-    flash(msg_flash, 'info')
+    flash('O processo de envio de mensagens para os ausentes foi iniciado em segundo plano. Pode levar alguns minutos para concluir.', 'info')
     return redirect(url_for('view_ensaio', id=id))
 
 @app.route('/ensaios/<int:id>/notificar_presentes', methods=['POST'])
 @login_required
 @roles_required(['master', 'lider_jovens', 'coordenador'])
 def notify_presentes(id):
+    import threading
     ensaio = Rehearsal.query.get_or_404(id)
     attendances = RehearsalAttendance.query.filter_by(rehearsal_id=id, is_present=True).all()
     presentes_nomes = [a.member_name for a in attendances]
     
     members = get_members_data()
-    enviados = 0
     
     ensaio_data_str = ensaio.date.strftime('%d/%m/%Y')
     mensagem = f"A Paz do Senhor! Passando para agradecer a Deus pela sua vida e pela sua presença no ensaio de {ensaio_data_str}. Vocês são muito importantes! 🙏"
     
-    enviados_nomes = []
-    falhas_nomes = []
-    import time
-    from services.whatsapp_service import send_whatsapp_message
+    threading.Thread(target=process_bulk_whatsapp, args=(members, presentes_nomes, mensagem)).start()
     
-    for m in members:
-        nome = m.get('Nome')
-        if nome in presentes_nomes:
-            if m.get('Telefone'):
-                phone = str(m['Telefone'])
-                success, _ = send_whatsapp_message(phone=phone, message=mensagem, is_image=False)
-                if success:
-                    enviados_nomes.append(nome)
-                    delay_seconds = random.uniform(5, 30)
-        time.sleep(delay_seconds)
-                else:
-                    falhas_nomes.append(nome)
-            else:
-                falhas_nomes.append(f"{nome} (Sem telefone)")
-    
-    msg_flash = ""
-    if enviados_nomes:
-        msg_flash += f"Enviado para: {', '.join(enviados_nomes)}. "
-    if falhas_nomes:
-        msg_flash += f"Não enviado para: {', '.join(falhas_nomes)}."
-    if not msg_flash:
-        msg_flash = "Nenhum membro encontrado ou notificado."
-            
-    flash(msg_flash, 'info')
+    flash('O processo de envio de mensagens para os presentes foi iniciado em segundo plano. Pode levar alguns minutos para concluir.', 'info')
     return redirect(url_for('view_ensaio', id=id))
 
 @app.route('/ensaios/relatorio_geral')
