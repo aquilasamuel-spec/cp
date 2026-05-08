@@ -85,6 +85,7 @@ def run_automation():
     success_count = 0
     errors = []
     import time
+import random  # Added for random delay between messages
     for leader_phone in leader_phones:
         success, result = send_whatsapp_message(leader_phone, text)
         if success:
@@ -93,7 +94,8 @@ def run_automation():
         else:
             print(f"Falha ao enviar notificação para o líder {leader_phone}: {result}")
             errors.append(f"{leader_phone}: {result}")
-        time.sleep(10)
+            delay_seconds = random.uniform(5, 30)  # Random delay between 5 and 30 seconds
+        time.sleep(delay_seconds)
             
     if success_count > 0:
         return True, f"Notificações enviadas com sucesso para {success_count} líder(es)!"
