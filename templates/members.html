@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="row g-3 mb-4 align-items-center">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <h2 class="fw-bold mb-0">Gestão de Membros</h2>
         <p class="text-secondary small mb-0">Visualize e edite as informações dos componentes do CP</p>
     </div>
@@ -12,10 +12,15 @@
             <input type="text" id="memberSearch" class="form-control border-start-0 ps-0" placeholder="Pesquisar membro por nome..." onkeyup="filterMembers()">
         </div>
     </div>
-    <div class="col-md-3 text-end">
-        <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#newMemberModal">
-            <i class="fas fa-plus me-2"></i> Novo Membro
-        </button>
+    <div class="col-md-4 text-end">
+        <div class="d-flex gap-2 justify-content-md-end">
+            <a href="{{ url_for('export_members') }}" class="btn btn-success text-white">
+                <i class="fas fa-file-excel me-2"></i> Exportar Planilha
+            </a>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newMemberModal">
+                <i class="fas fa-plus me-2"></i> Novo Membro
+            </button>
+        </div>
     </div>
 </div>
 
