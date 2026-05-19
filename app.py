@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from models import db, User, TreasuryEntry, Rehearsal, RehearsalAttendance
 from services.excel_service import get_birthdays_of_month, get_members_data, update_member_data, add_member, delete_member
@@ -166,6 +166,35 @@ def dashboard():
 def members():
     members_list = get_members_data()
     return render_template('members.html', members=members_list)
+
+@app.route('/membros/exportar')
+@login_required
+@roles_required(['master', 'coordenador', 'tesoureiro', 'lider_jovens', 'secretario'])
+def export_members():
+    from services.excel_service import ACTIVE_FILE, get_members_data, save_active_data
+    import pandas as pd
+    try:
+        if not os.path.exists(ACTIVE_FILE):
+            members_list = get_members_data()
+            if members_list:
+                df = pd.DataFrame([ {
+                    'NOME': m['Nome'],
+                    'DATA DE NASCIMENTO': m['Data_Nascimento'],
+                    'SEXO': m['Gênero'],
+                    'CIDADE': m['Congregação'],
+                    'FUNÇÃO': m['Cargo'],
+                    'TELEFONE': m['Telefone']
+                } for m in members_list])
+                save_active_data(df)
+        
+        if os.path.exists(ACTIVE_FILE):
+            return send_file(ACTIVE_FILE, as_attachment=True, download_name='MEMBROS_ATIVOS.xlsx')
+        else:
+            flash('Arquivo de membros não encontrado no servidor.', 'danger')
+    except Exception as e:
+        flash(f'Erro ao exportar planilha: {e}', 'danger')
+        
+    return redirect(url_for('members'))
 
 @app.route('/membros/novo', methods=['POST'])
 @login_required
