@@ -27,13 +27,18 @@ def send_whatsapp_message(phone, message, is_image=False, caption=None):
 
     try:
         if is_image:
-            # Enviar Imagem
+            # Enviar Imagem / Arquivo
+            import mimetypes
             url = f"{api_url}/waInstance{id_instance}/sendFileByUpload/{api_token}"
             if not os.path.exists(message):
                 return False, f"Arquivo não encontrado: {message}"
                 
+            mime_type, _ = mimetypes.guess_type(message)
+            if not mime_type:
+                mime_type = 'application/octet-stream'
+                
             with open(message, 'rb') as f:
-                files = {'file': (os.path.basename(message), f, 'image/png')}
+                files = {'file': (os.path.basename(message), f, mime_type)}
                 payload = {
                     "chatId": chat_id,
                     "caption": caption or ""
