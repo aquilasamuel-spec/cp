@@ -1,6 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models import db, User, TreasuryEntry, Rehearsal, RehearsalAttendance
+from models import db, User, TreasuryEntry, Rehearsal, RehearsalAttendance, Broadcast, BroadcastRecipient
 from services.excel_service import get_birthdays_of_month, get_members_data, update_member_data, add_member, delete_member
 from services.whatsapp_service import send_whatsapp_message
 from functools import wraps
@@ -509,6 +509,177 @@ def notify_leaders_today():
         return jsonify({'success': success, 'message': message})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+def send_broadcast_thread(broadcast_id, app_instance):
+    with app_instance.app_context():
+        import time
+        import random
+        from services.whatsapp_service import send_whatsapp_message
+        
+        broadcast = Broadcast.query.get(broadcast_id)
+        if not broadcast:
+            return
+            
+        broadcast.status = 'sending'
+        db.session.commit()
+        
+        recipients = BroadcastRecipient.query.filter_by(broadcast_id=broadcast_id, status='pending').all()
+        
+        for rep in recipients:
+            if not rep.phone:
+                rep.status = 'no_phone'
+                broadcast.failed_recipients += 1
+                db.session.commit()
+                continue
+                
+            try:
+                if broadcast.file_path:
+                    abs_file_path = os.path.join(os.getcwd(), broadcast.file_path)
+                    success, result = send_whatsapp_message(
+                        phone=rep.phone,
+                        message=abs_file_path,
+                        is_image=True,
+                        caption=broadcast.message
+                    )
+                else:
+                    success, result = send_whatsapp_message(
+                        phone=rep.phone,
+                        message=broadcast.message,
+                        is_image=False
+                    )
+                
+                if success:
+                    rep.status = 'sent'
+                    broadcast.sent_recipients += 1
+                else:
+                    rep.status = 'failed'
+                    rep.error_message = str(result)
+                    broadcast.failed_recipients += 1
+            except Exception as e:
+                rep.status = 'failed'
+                rep.error_message = str(e)
+                broadcast.failed_recipients += 1
+                
+            db.session.commit()
+            
+            # Delay randomico entre 5 e 15 segundos para evitar bloqueios do WhatsApp
+            time.sleep(random.uniform(5, 15))
+            
+        broadcast.status = 'completed'
+        db.session.commit()
+
+@app.route('/disparos')
+@login_required
+@roles_required(['master', 'coordenador', 'lider_jovens'])
+def disparos_list():
+    members = get_members_data()
+    members = sorted(members, key=lambda x: str(x.get('Nome', '')))
+    
+    broadcasts = Broadcast.query.order_by(Broadcast.date.desc()).all()
+    
+    users = User.query.all()
+    user_map = {u.id: u.username for u in users}
+    
+    return render_template('disparos.html', members=members, broadcasts=broadcasts, user_map=user_map)
+
+@app.route('/disparos/enviar', methods=['POST'])
+@login_required
+@roles_required(['master', 'coordenador', 'lider_jovens'])
+def enviar_disparo():
+    from werkzeug.utils import secure_filename
+    
+    mensagem = request.form.get('mensagem')
+    selected_names = request.form.getlist('selected_members')
+    
+    if not selected_names:
+        flash('Por favor, selecione pelo menos um destinatário.', 'danger')
+        return redirect(url_for('disparos_list'))
+        
+    file_path = None
+    file_type = None
+    
+    media_file = request.files.get('midia')
+    if media_file and media_file.filename != '':
+        filename = secure_filename(media_file.filename)
+        unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
+        
+        upload_dir = os.path.join(os.getcwd(), 'static', 'uploads', 'broadcasts')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        target_path = os.path.join(upload_dir, unique_filename)
+        media_file.save(target_path)
+        
+        file_path = f"static/uploads/broadcasts/{unique_filename}"
+        
+        ext = unique_filename.split('.')[-1].lower()
+        if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
+            file_type = 'image'
+        elif ext in ['mp4', 'avi', 'mov', 'mkv', 'webm']:
+            file_type = 'video'
+        else:
+            file_type = 'document'
+            
+    broadcast = Broadcast(
+        message=mensagem,
+        file_path=file_path,
+        file_type=file_type,
+        created_by=current_user.id,
+        status='pending',
+        total_recipients=len(selected_names),
+        sent_recipients=0,
+        failed_recipients=0
+    )
+    db.session.add(broadcast)
+    db.session.commit()
+    
+    members = get_members_data()
+    member_phone_map = {m['Nome']: m['Telefone'] for m in members if m.get('Nome')}
+    
+    for name in selected_names:
+        phone = member_phone_map.get(name, '')
+        recipient = BroadcastRecipient(
+            broadcast_id=broadcast.id,
+            member_name=name,
+            phone=phone,
+            status='pending'
+        )
+        db.session.add(recipient)
+        
+    db.session.commit()
+    
+    threading.Thread(target=send_broadcast_thread, args=(broadcast.id, app)).start()
+    
+    flash('O disparo foi iniciado em segundo plano! Acompanhe o progresso no histórico abaixo.', 'success')
+    return redirect(url_for('disparos_list'))
+
+@app.route('/disparos/status/<int:id>')
+@login_required
+@roles_required(['master', 'coordenador', 'lider_jovens'])
+def disparo_status(id):
+    broadcast = Broadcast.query.get_or_404(id)
+    recipients = BroadcastRecipient.query.filter_by(broadcast_id=id).all()
+    
+    recipients_data = [{
+        'name': r.member_name,
+        'phone': r.phone,
+        'status': r.status,
+        'error': r.error_message or ''
+    } for r in recipients]
+    
+    percent = 0
+    total = broadcast.total_recipients
+    if total > 0:
+        percent = int(((broadcast.sent_recipients + broadcast.failed_recipients) / total) * 100)
+        
+    return jsonify({
+        'id': broadcast.id,
+        'status': broadcast.status,
+        'total': total,
+        'sent': broadcast.sent_recipients,
+        'failed': broadcast.failed_recipients,
+        'percent': percent,
+        'recipients': recipients_data
+    })
 
 @app.route('/ensaios')
 @login_required
