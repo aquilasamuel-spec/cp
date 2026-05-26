@@ -50,6 +50,12 @@
                 href="{{ url_for('ensaios_list') }}">
                 <i class="fas fa-music"></i> Ensaios
             </a>
+            {% if current_user.role in ['master', 'coordenador', 'lider_jovens'] %}
+            <a class="nav-link {% if request.endpoint == 'disparos_list' %}active{% endif %}"
+                href="{{ url_for('disparos_list') }}">
+                <i class="fas fa-paper-plane"></i> Disparos
+            </a>
+            {% endif %}
             {% if current_user.role in ['master', 'coordenador'] %}
             <a class="nav-link {% if request.endpoint == 'access_management' %}active{% endif %}"
                 href="{{ url_for('access_management') }}">

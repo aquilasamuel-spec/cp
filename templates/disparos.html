@@ -1,0 +1,713 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    /* Estilos Premium para Disparos */
+    .drop-zone {
+        border: 2px dashed rgba(0, 74, 173, 0.2);
+        border-radius: 12px;
+        padding: 30px 20px;
+        text-align: center;
+        background: rgba(0, 74, 173, 0.02);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .drop-zone:hover, .drop-zone.dragover {
+        background: rgba(0, 74, 173, 0.06);
+        border-color: var(--primary-blue);
+    }
+    
+    .drop-zone i {
+        font-size: 2.5rem;
+        color: var(--primary-blue);
+        margin-bottom: 10px;
+        transition: transform 0.3s ease;
+    }
+    
+    .drop-zone:hover i {
+        transform: translateY(-5px);
+    }
+    
+    .preview-container {
+        display: none;
+        margin-top: 15px;
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        max-width: 100%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .preview-media {
+        max-height: 200px;
+        width: auto;
+        max-width: 100%;
+        display: block;
+        margin: 0 auto;
+        object-fit: contain;
+    }
+    
+    .btn-remove-preview {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: rgba(220, 53, 69, 0.85);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s;
+        z-index: 10;
+    }
+    
+    .btn-remove-preview:hover {
+        background: rgb(220, 53, 69);
+    }
+
+    .members-selector-card {
+        height: 480px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .members-list-scroll {
+        flex-grow: 1;
+        overflow-y: auto;
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+        padding-right: 5px;
+    }
+
+    .member-item-row {
+        transition: background-color 0.2s ease;
+        cursor: pointer;
+    }
+
+    .member-item-row:hover {
+        background-color: rgba(0, 74, 173, 0.02);
+    }
+
+    .member-item-row.selected-row {
+        background-color: rgba(0, 74, 173, 0.04);
+    }
+
+    /* Glassmorphism timeline for broadcasts history */
+    .broadcast-card {
+        border-left: 4px solid var(--primary-blue);
+        transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+        border-radius: 12px !important;
+    }
+
+    .broadcast-card.status-sending {
+        border-left-color: #ffc107;
+        animation: border-pulse 2s infinite ease-in-out;
+    }
+
+    .broadcast-card.status-completed {
+        border-left-color: var(--success);
+    }
+
+    .broadcast-card.status-failed {
+        border-left-color: var(--danger);
+    }
+
+    @keyframes border-pulse {
+        0% { border-left-color: rgba(255, 193, 7, 0.6); }
+        50% { border-left-color: rgba(255, 193, 7, 1); }
+        100% { border-left-color: rgba(255, 193, 7, 0.6); }
+    }
+
+    .broadcast-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px rgba(0, 74, 173, 0.08);
+    }
+
+    .progress-bar-glow {
+        box-shadow: 0 0 8px rgba(0, 74, 173, 0.3);
+    }
+
+    .whatsapp-badge {
+        background: #25D366;
+        color: white;
+        font-weight: 600;
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        border-radius: 20px;
+    }
+
+    .whatsapp-badge-disabled {
+        background: #e9ecef;
+        color: #6c757d;
+        font-weight: 600;
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        border-radius: 20px;
+    }
+</style>
+
+<div class="row g-3 mb-4 align-items-center">
+    <div class="col-md-8">
+        <h2 class="fw-bold mb-0">Disparos de Mensagens</h2>
+        <p class="text-secondary small mb-0">Dispare comunicados em lote via WhatsApp com suporte a imagens e vídeos para os membros do CP</p>
+    </div>
+</div>
+
+<!-- Novo Disparo Form -->
+<form action="{{ url_for('enviar_disparo') }}" method="POST" enctype="multipart/form-data" id="broadcastForm">
+    <div class="row g-4 mb-5">
+        <!-- Coluna de Escrever Mensagem -->
+        <div class="col-lg-7">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-header bg-white">
+                    <h5 class="card-title fw-bold mb-0 text-primary">
+                        <i class="fas fa-edit me-2"></i>1. Escrever Comunicado
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold text-secondary">Mensagem de Texto</label>
+                        <textarea name="mensagem" id="mensagemText" class="form-control" rows="8" required
+                            placeholder="Escreva aqui a mensagem que será enviada. Dicas: use *texto* para negrito, _texto_ para itálico e emojis para destacar!"></textarea>
+                        <div class="d-flex justify-content-between mt-2">
+                            <span class="text-secondary small">Suporta formatação padrão do WhatsApp.</span>
+                            <span id="charCount" class="text-secondary small fw-medium">0 caracteres</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold text-secondary">Mídia Opcional (Imagem ou Vídeo)</label>
+                        
+                        <!-- Drag and Drop Zone -->
+                        <div class="drop-zone" id="dropZone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p class="mb-1 fw-bold text-secondary">Arraste e solte o arquivo aqui</p>
+                            <p class="text-muted small mb-0">ou clique para procurar no seu dispositivo</p>
+                            <span class="text-muted small d-block mt-1">(Imagens png, jpg, jpeg, gif ou vídeos mp4, avi, mov)</span>
+                            <input type="file" name="midia" id="fileInput" class="d-none" accept="image/*,video/*">
+                        </div>
+
+                        <!-- Preview Container -->
+                        <div class="preview-container" id="previewContainer">
+                            <button type="button" class="btn-remove-preview" id="btnRemovePreview" title="Remover mídia">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <img class="preview-media d-none" id="imagePreview" src="" alt="Prévia da imagem">
+                            <div class="p-3 text-center bg-light d-none" id="videoPreview">
+                                <i class="fas fa-video fa-3x text-primary mb-2"></i>
+                                <div class="fw-bold text-secondary" id="videoName">nome_do_video.mp4</div>
+                                <span class="badge bg-primary mt-1">Vídeo Carregado</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna de Selecionar Membros -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 members-selector-card">
+                <div class="card-header bg-white d-flex align-items-center justify-content-between">
+                    <h5 class="card-title fw-bold mb-0 text-primary">
+                        <i class="fas fa-users me-2"></i>2. Selecionar Destinatários
+                    </h5>
+                    <span id="selectedCount" class="badge bg-primary rounded-pill">0 selecionados</span>
+                </div>
+                <div class="card-body p-3 d-flex flex-column h-100" style="min-height: 0;">
+                    <!-- Campo de Busca -->
+                    <div class="mb-3">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-light border-end-0 text-secondary"><i class="fas fa-search"></i></span>
+                            <input type="text" id="memberSearch" class="form-control border-start-0 ps-0" 
+                                   placeholder="Procurar membro..." onkeyup="filterMembers()">
+                        </div>
+                    </div>
+
+                    <!-- Lista de Membros -->
+                    <div class="members-list-scroll table-responsive">
+                        <table class="table table-sm table-borderless align-middle mb-0">
+                            <thead>
+                                <tr class="border-bottom text-secondary" style="font-size: 0.75rem;">
+                                    <th class="pb-2" style="width: 40px;">
+                                        <input type="checkbox" class="form-check-input" id="selectAllCheckbox" onchange="toggleSelectAll(this)" checked>
+                                    </th>
+                                    <th class="pb-2">NOME</th>
+                                    <th class="pb-2 text-end">WHATSAPP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="membersTableBody">
+                                {% for m in members %}
+                                <tr class="member-item-row border-bottom border-light" onclick="toggleRowCheckbox(this, event)">
+                                    <td>
+                                        <input type="checkbox" name="selected_members" value="{{ m.Nome }}" 
+                                               class="form-check-input member-checkbox" onchange="updateSelectedCount()" checked>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-dark" style="font-size: 0.85rem;">{{ m.Nome }}</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">{{ m.Cargo }} ({{ m.Congregação }})</div>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if m.Telefone %}
+                                        <span class="whatsapp-badge" title="{{ m.Telefone }}">
+                                            <i class="fab fa-whatsapp me-1"></i>Sim
+                                        </span>
+                                        {% else %}
+                                        <span class="whatsapp-badge-disabled" title="Sem número de WhatsApp">
+                                            <i class="fab fa-whatsapp me-1 text-muted"></i>Não
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="pt-3 border-top mt-auto">
+                        <button type="submit" class="btn btn-primary w-100 text-white py-2" id="btnSubmit">
+                            <i class="fas fa-paper-plane me-2"></i> Iniciar Disparo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- Histórico de Disparos -->
+<div class="row">
+    <div class="col-12">
+        <h3 class="fw-bold mb-4 text-dark"><i class="fas fa-history me-2 text-secondary"></i>Histórico de Disparos</h3>
+        
+        {% if not broadcasts %}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center p-5 text-secondary">
+                <i class="fas fa-paper-plane fa-3x mb-3 text-muted opacity-50"></i>
+                <h5>Nenhum disparo realizado ainda</h5>
+                <p class="mb-0">Crie seu primeiro disparo acima para enviar mensagens em lote.</p>
+            </div>
+        </div>
+        {% else %}
+        <div class="row g-4" id="broadcastsHistory">
+            {% for b in broadcasts %}
+            <div class="col-12 col-md-6" id="broadcast-card-{{ b.id }}">
+                <div class="card border-0 shadow-sm h-100 broadcast-card status-{{ b.status }}" style="overflow: hidden;">
+                    <div class="card-body p-4 d-flex flex-column h-100">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <span class="text-muted small fw-medium">
+                                <i class="far fa-calendar-alt me-1"></i>{{ b.date.strftime('%d/%m/%Y %H:%M') }}
+                            </span>
+                            
+                            <!-- Badges de Status -->
+                            <div class="status-badges-container" id="status-badges-{{ b.id }}">
+                                {% if b.status == 'pending' %}
+                                <span class="badge bg-secondary">Pendente</span>
+                                {% elif b.status == 'sending' %}
+                                <span class="badge bg-warning text-dark"><i class="fas fa-spinner fa-spin me-1"></i>Enviando...</span>
+                                {% elif b.status == 'completed' %}
+                                <span class="badge bg-success">Concluído</span>
+                                {% elif b.status == 'failed' %}
+                                <span class="badge bg-danger">Falhou</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Autor e Mídia -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="small text-secondary">
+                                <i class="fas fa-user-edit me-1"></i>Por: <strong>{{ user_map.get(b.created_by, 'Desconhecido') }}</strong>
+                            </span>
+                            
+                            {% if b.file_path %}
+                            <a href="/{{ b.file_path }}" target="_blank" class="btn btn-sm btn-light border py-1 px-2" style="font-size: 0.75rem;">
+                                {% if b.file_type == 'image' %}
+                                <i class="fas fa-image text-primary me-1"></i>Ver Imagem
+                                {% elif b.file_type == 'video' %}
+                                <i class="fas fa-video text-danger me-1"></i>Ver Vídeo
+                                {% else %}
+                                <i class="fas fa-file text-secondary me-1"></i>Ver Arquivo
+                                {% endif %}
+                            </a>
+                            {% endif %}
+                        </div>
+
+                        <!-- Texto da Mensagem -->
+                        <div class="bg-light p-3 rounded mb-4 flex-grow-1" style="white-space: pre-wrap; font-size: 0.85rem; max-height: 120px; overflow-y: auto;">{{ b.message }}</div>
+
+                        <!-- Progresso de Entrega -->
+                        <div class="mt-auto">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small fw-semibold text-secondary">Progresso de Entrega</span>
+                                <span class="small fw-bold text-dark" id="progress-text-{{ b.id }}">
+                                    Enviados: {{ b.sent_recipients }} / Total: {{ b.total_recipients }}
+                                </span>
+                            </div>
+                            
+                            <!-- Barra de progresso -->
+                            {% set percent = 0 %}
+                            {% if b.total_recipients > 0 %}
+                                {% set percent = (((b.sent_recipients + b.failed_recipients) / b.total_recipients) * 100)|int %}
+                            {% endif %}
+                            
+                            <div class="progress rounded-pill mb-3" style="height: 10px; background-color: rgba(0,0,0,0.05);">
+                                <div class="progress-bar rounded-pill progress-bar-glow {% if b.status == 'sending' %}progress-bar-striped progress-bar-animated bg-warning{% elif b.status == 'completed' %}bg-success{% elif b.status == 'failed' %}bg-danger{% else %}bg-primary{% endif %}" 
+                                     id="progress-bar-{{ b.id }}"
+                                     role="progressbar" 
+                                     style="width: {{ percent }}%;" 
+                                     aria-valuenow="{{ percent }}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                </div>
+                            </div>
+
+                            <!-- Botão para expandir e ver detalhes de cada destinatário -->
+                            <button class="btn btn-sm btn-outline-secondary w-100" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#collapseRecipients{{ b.id }}" 
+                                    aria-expanded="false" aria-controls="collapseRecipients{{ b.id }}">
+                                <i class="fas fa-list-ul me-1"></i> Ver Detalhes dos Destinatários
+                            </button>
+                            
+                            <div class="collapse mt-3" id="collapseRecipients{{ b.id }}">
+                                <div class="card card-body p-2 border bg-light text-secondary" style="max-height: 200px; overflow-y: auto; font-size: 0.8rem;">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-borderless align-middle mb-0">
+                                            <thead>
+                                                <tr class="border-bottom">
+                                                    <th>Nome</th>
+                                                    <th>WhatsApp</th>
+                                                    <th class="text-end">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="recipients-list-{{ b.id }}">
+                                                <!-- A ser populado dinamicamente ou renderizado inicialmente via jinja -->
+                                                {% for r in b.recipients %}
+                                                <tr class="border-bottom border-light">
+                                                    <td>{{ r.member_name }}</td>
+                                                    <td>{{ r.phone or '-' }}</td>
+                                                    <td class="text-end">
+                                                        {% if r.status == 'sent' %}
+                                                        <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Enviado</span>
+                                                        {% elif r.status == 'failed' %}
+                                                        <span class="text-danger fw-bold" title="{{ r.error_message }}"><i class="fas fa-times-circle me-1"></i>Falhou</span>
+                                                        {% elif r.status == 'no_phone' %}
+                                                        <span class="text-warning fw-bold"><i class="fas fa-exclamation-circle me-1"></i>Sem número</span>
+                                                        {% else %}
+                                                        <span class="text-muted"><i class="fas fa-clock me-1"></i>Pendente</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Inicializar contador de selecionados
+        updateSelectedCount();
+
+        // Configurar contador de caracteres da mensagem
+        const textMsg = document.getElementById('mensagemText');
+        const charCounter = document.getElementById('charCount');
+        textMsg.addEventListener('input', function() {
+            const count = this.value.length;
+            charCounter.textContent = `${count} caracteres`;
+        });
+
+        // Configurar Área de Drag and Drop
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const videoPreview = document.getElementById('videoPreview');
+        const videoName = document.getElementById('videoName');
+        const btnRemovePreview = document.getElementById('btnRemovePreview');
+
+        // Dispara click no input de arquivo quando clica na drop-zone
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // Eventos de dragover e dragleave para efeitos de hover
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        // Evento de drop do arquivo
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect(files[0]);
+            }
+        });
+
+        // Evento de seleção clássica de arquivo
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handleFileSelect(this.files[0]);
+            }
+        });
+
+        // Remover prévia do arquivo
+        btnRemovePreview.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.value = '';
+            previewContainer.style.display = 'none';
+            imagePreview.classList.add('d-none');
+            videoPreview.classList.add('d-none');
+            dropZone.classList.remove('d-none');
+        });
+
+        // Processar exibição de prévia
+        function handleFileSelect(file) {
+            dropZone.classList.add('d-none');
+            previewContainer.style.display = 'block';
+
+            const fileType = file.type;
+
+            if (fileType.startsWith('image/')) {
+                // É Imagem
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    imagePreview.classList.remove('d-none');
+                    videoPreview.classList.add('d-none');
+                }
+                reader.readAsDataURL(file);
+            } else if (fileType.startsWith('video/')) {
+                // É Vídeo
+                videoName.textContent = file.name;
+                videoPreview.classList.remove('d-none');
+                imagePreview.classList.add('d-none');
+            } else {
+                // Mídia desconhecida
+                videoName.textContent = `${file.name} (${file.type})`;
+                videoPreview.classList.remove('d-none');
+                imagePreview.classList.add('d-none');
+            }
+        }
+
+        // Validação no envio
+        const broadcastForm = document.getElementById('broadcastForm');
+        broadcastForm.addEventListener('submit', function(e) {
+            const checkedCount = document.querySelectorAll('.member-checkbox:checked').length;
+            if (checkedCount === 0) {
+                e.preventDefault();
+                alert('Erro: Selecione pelo menos 1 membro para enviar!');
+            }
+        });
+
+        // Ativar Polling para disparos ativos
+        startPollingForActiveBroadcasts();
+    });
+
+    // Função de Filtragem de Membros
+    function filterMembers() {
+        const query = document.getElementById('memberSearch').value.toUpperCase();
+        const rows = document.querySelectorAll('#membersTableBody .member-item-row');
+        
+        rows.forEach(row => {
+            const nameEl = row.querySelector('.fw-semibold');
+            if (nameEl) {
+                const nameText = nameEl.textContent || nameEl.innerText;
+                if (nameText.toUpperCase().indexOf(query) > -1) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    // Toggle para Checkbox de Selecionar Todos
+    function toggleSelectAll(selectAllCheckbox) {
+        // Encontra apenas as checkboxes visíveis (para evitar marcar itens escondidos por filtro, ou marca tudo se preferir)
+        // Por padrão no disparo em massa, vamos marcar todas as checkboxes.
+        const checkboxes = document.querySelectorAll('.member-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = selectAllCheckbox.checked;
+            // Atualizar o estilo da linha correspondente
+            const row = cb.closest('.member-item-row');
+            if (row) {
+                if (cb.checked) {
+                    row.classList.add('selected-row');
+                } else {
+                    row.classList.remove('selected-row');
+                }
+            }
+        });
+        updateSelectedCount();
+    }
+
+    // Permitir clicar em qualquer parte da linha do membro para selecionar/deselecionar
+    function toggleRowCheckbox(row, event) {
+        // Se o clique foi diretamente no input checkbox, deixa o evento nativo correr
+        if (event.target.classList.contains('form-check-input')) {
+            if (event.target.checked) {
+                row.classList.add('selected-row');
+            } else {
+                row.classList.remove('selected-row');
+            }
+            return;
+        }
+
+        const checkbox = row.querySelector('.member-checkbox');
+        if (checkbox) {
+            checkbox.checked = !checkbox.checked;
+            if (checkbox.checked) {
+                row.classList.add('selected-row');
+            } else {
+                row.classList.remove('selected-row');
+            }
+            updateSelectedCount();
+        }
+    }
+
+    // Atualiza contagem de membros selecionados
+    function updateSelectedCount() {
+        const checkedCount = document.querySelectorAll('.member-checkbox:checked').length;
+        document.getElementById('selectedCount').textContent = `${checkedCount} selecionados`;
+        
+        // Sincronizar o select all checkbox
+        const totalCheckboxes = document.querySelectorAll('.member-checkbox').length;
+        const selectAllCb = document.getElementById('selectAllCheckbox');
+        if (selectAllCb) {
+            selectAllCb.checked = checkedCount === totalCheckboxes;
+        }
+    }
+
+    // POLLING: Monitoramento em Tempo Real dos disparos ativos
+    let activePollers = {};
+
+    function startPollingForActiveBroadcasts() {
+        // Encontrar todos os disparos que estão com status "pending" ou "sending"
+        const activeCards = document.querySelectorAll('.broadcast-card.status-pending, .broadcast-card.status-sending');
+        
+        activeCards.forEach(card => {
+            const id = card.id.replace('broadcast-card-', '');
+            if (!activePollers[id]) {
+                // Iniciar polling a cada 3 segundos
+                activePollers[id] = setInterval(() => pollBroadcastStatus(id), 3000);
+            }
+        });
+    }
+
+    function pollBroadcastStatus(broadcastId) {
+        fetch(`/disparos/status/${broadcastId}`)
+            .then(res => res.json())
+            .then(data => {
+                updateBroadcastProgressUI(data);
+                
+                // Se terminou ou falhou, limpar o poller
+                if (data.status === 'completed' || data.status === 'failed') {
+                    clearInterval(activePollers[broadcastId]);
+                    delete activePollers[broadcastId];
+                }
+            })
+            .catch(err => console.error("Erro no polling de status:", err));
+    }
+
+    function updateBroadcastProgressUI(data) {
+        const card = document.getElementById(`broadcast-card-${data.id}`);
+        if (!card) return;
+
+        // 1. Atualizar classe do Card
+        card.className = `card border-0 shadow-sm h-100 broadcast-card status-${data.status}`;
+
+        // 2. Atualizar Badge de Status
+        const badgesContainer = document.getElementById(`status-badges-${data.id}`);
+        if (badgesContainer) {
+            if (data.status === 'pending') {
+                badgesContainer.innerHTML = `<span class="badge bg-secondary">Pendente</span>`;
+            } else if (data.status === 'sending') {
+                badgesContainer.innerHTML = `<span class="badge bg-warning text-dark"><i class="fas fa-spinner fa-spin me-1"></i>Enviando...</span>`;
+            } else if (data.status === 'completed') {
+                badgesContainer.innerHTML = `<span class="badge bg-success">Concluído</span>`;
+            } else if (data.status === 'failed') {
+                badgesContainer.innerHTML = `<span class="badge bg-danger">Falhou</span>`;
+            }
+        }
+
+        // 3. Atualizar Texto do Progresso
+        const progressText = document.getElementById(`progress-text-${data.id}`);
+        if (progressText) {
+            progressText.textContent = `Enviados: ${data.sent} / Total: ${data.total}`;
+        }
+
+        // 4. Atualizar Barra de Progresso
+        const progressBar = document.getElementById(`progress-bar-${data.id}`);
+        if (progressBar) {
+            progressBar.style.width = `${data.percent}%`;
+            progressBar.setAttribute('aria-valuenow', data.percent);
+            
+            // Alterar cor da barra baseado no status
+            progressBar.className = "progress-bar rounded-pill progress-bar-glow";
+            if (data.status === 'sending') {
+                progressBar.classList.add('progress-bar-striped', 'progress-bar-animated', 'bg-warning');
+            } else if (data.status === 'completed') {
+                progressBar.classList.add('bg-success');
+            } else if (data.status === 'failed') {
+                progressBar.classList.add('bg-danger');
+            } else {
+                progressBar.classList.add('bg-primary');
+            }
+        }
+
+        // 5. Atualizar Tabela de Destinatários
+        const recipientsList = document.getElementById(`recipients-list-${data.id}`);
+        if (recipientsList && data.recipients) {
+            let html = '';
+            data.recipients.forEach(r => {
+                let statusHtml = '';
+                if (r.status === 'sent') {
+                    statusHtml = `<span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Enviado</span>`;
+                } else if (r.status === 'failed') {
+                    statusHtml = `<span class="text-danger fw-bold" title="${r.error}"><i class="fas fa-times-circle me-1"></i>Falhou</span>`;
+                } else if (r.status === 'no_phone') {
+                    statusHtml = `<span class="text-warning fw-bold"><i class="fas fa-exclamation-circle me-1"></i>Sem número</span>`;
+                } else {
+                    statusHtml = `<span class="text-muted"><i class="fas fa-clock me-1"></i>Pendente</span>`;
+                }
+                
+                html += `
+                    <tr class="border-bottom border-light">
+                        <td>${r.name}</td>
+                        <td>${r.phone || '-'}</td>
+                        <td class="text-end">${statusHtml}</td>
+                    </tr>
+                `;
+            });
+            recipientsList.innerHTML = html;
+        }
+    }
+</script>
+{% endblock %}
