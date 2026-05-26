@@ -42,3 +42,26 @@ class RehearsalAttendance(db.Model):
     rehearsal_id = db.Column(db.Integer, db.ForeignKey('rehearsal.id', ondelete='CASCADE'), nullable=False)
     member_name = db.Column(db.String(100), nullable=False)
     is_present = db.Column(db.Boolean, default=False)
+
+class Broadcast(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.DateTime, default=datetime.utcnow)
+    message = db.Column(db.Text)
+    file_path = db.Column(db.String(255))
+    file_type = db.Column(db.String(50))  # 'image', 'video', etc.
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'sending', 'completed', 'failed'
+    total_recipients = db.Column(db.Integer, default=0)
+    sent_recipients = db.Column(db.Integer, default=0)
+    failed_recipients = db.Column(db.Integer, default=0)
+    
+    # Relationship
+    recipients = db.relationship('BroadcastRecipient', backref='broadcast', cascade='all, delete-orphan')
+
+class BroadcastRecipient(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    broadcast_id = db.Column(db.Integer, db.ForeignKey('broadcast.id', ondelete='CASCADE'), nullable=False)
+    member_name = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(30))
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'sent', 'failed', 'no_phone'
+    error_message = db.Column(db.Text)
